@@ -1,1 +1,0 @@
-# Yacc-to-PEG-translator
