@@ -18,11 +18,12 @@ class TreetopGenerator < Generator
   def generate filename
     super
 
+    grammar_name = filename.split("/").last
+
     case filename[0]
     when /[a-z]/
-      grammar_name = filename[0].upcase + filename[1...filename.size]
+      grammar_name = grammar_name[0].upcase + grammar_name[1...grammar_name.size]
     when /[A-Z]/
-      grammar_name = filename
     else
       grammar_name = "GrammarName"
     end

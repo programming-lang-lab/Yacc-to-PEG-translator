@@ -5,7 +5,7 @@ class PackCCGenerator < Generator
   def generate filename
     super
 
-    name = filename.slice(/\w+/)
+    name = filename.split("/").last.slice(/\w+/)
     code = "%prefix \"#{name}\"\n\n"
     
     File.open(filename, "w"){|file|

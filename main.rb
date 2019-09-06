@@ -1,6 +1,5 @@
 # coding: utf-8
 #require 'pp'
-require 'optparse'
 require './parser/lex_parser.rb'
 require './parser/yacc_parser.rb'
 require './lib/translator.rb'
@@ -17,27 +16,27 @@ lex_filename = nil
 filename = nil
 lex_id = nil
 
-opt = OptionParser.new
-#opt.on('-p val', '--peg', 'add a peg description'){|v|
-#  peg_description = PEGParser.new open(v).read
-#}
-
-opt.on('-y val', '--yacc', 'add a yacc description'){|v|
-  yacc_description = YaccParser.new open(v, encoding: 'utf-8').read
+ARGV.each_with_index{|arg, idx|
+  case arg
+  when /\A-y\Z/, /\A--yacc\Z/
+    yacc_description = YaccParser.new open(ARGV[idx+1], encoding: 'utf-8').read
+  when /\A-l\Z/, /\A--lex\Z/
+    lex_filename = ARGV[idx+1]
+  # when /\A-p\Z/
+    # peg_description = PEGParser.new open(ARGV[idx+1], encoding: 'utf-8').read
+  when /\A-o\Z/
+    filename = ARGV[idx+1]
+  when /\A-i\Z/, /\A--id\Z/
+    lex_id = ARGV[idx+1]
+  else
+    # type code here
+  end
 }
-
-opt.on('-l val', '--lex', 'add a lex description'){|v| lex_filename = v }
-
-opt.on('-o val', 'name output'){|v| filename = v }
-
-opt.on('-i val', '--id', 'add lex identifier'){|v| lex_id = v }
-
-opt.parse!(ARGV)
 
 lex_description = LexParser.new open(lex_filename, encoding: 'utf-8').read, lex_id unless lex_filename.nil?
 
 #peg_parser = PEGParser.new peg_description
-#peg_parser.parse 
+#peg_parser.parse
 if yacc_description && lex_description
   grammar = lex_description.parse
   grammar = (yacc_description.parse + grammar).translate
