@@ -11,6 +11,7 @@ class Generator
       puts "filename is not defined."
       exit 1
     end
+
   end
 
   def generate_rh rh
@@ -44,11 +45,11 @@ class Generator
     end
     code
   end
-  
+
   def join_repeat rpt, out_of_array
     code = send("join_#{rpt.rule.class.name.downcase}", rpt.rule)
     ary = rpt.rule
-    if code[0] != '(' && (ary.size > 1 && ary.find{|a| a.is_a?(String)} || (ary.size == 1 && ary.find{|a| a.is_a?(Array) && a.size > 1 && a.find{|b| b.is_a?(String)}}))
+    if judge_param code, ary
       code = "(" + code.rstrip + ")* " 
     else
       code = code.rstrip + "* "
@@ -59,7 +60,7 @@ class Generator
   def join_negativelookahead neg, out_of_array
     code = send("join_#{neg.rule.class.name.downcase}", neg.rule)
     ary = neg.rule
-    if code[0] != '(' && (ary.size > 1 && ary.find{|a| a.is_a?(String)} || (ary.size == 1 && ary.find{|a| a.is_a?(Array) && a.size > 1 && a.find{|b| b.is_a?(String)}}))
+    if judge_param code, ary
       code = "!(" + code.rstrip + ") " 
     else
       code = "!" + code.rstrip + " "
@@ -69,5 +70,10 @@ class Generator
   
   def join_nilclass sym, out_of_array
     ""
+  end
+
+  def judge_param code, ary
+    code != '(' && (ary.size > 1 && ary.find{|a| a.is_a?(String)} \
+      || (ary.size == 1 && ary.find{|a| a.is_a?(Array) && a.size > 1 && a.find{|b| b.is_a?(String)}}))
   end
 end
