@@ -219,24 +219,113 @@ module RhOrderSolver
 
             # 右辺から導出される記号列同士に包含関係がある場合に入れ替え
             if rh.size > idx && rh2.size > idx
-              first_rh = calc_first(rh[idx], [rule.lh])
-              first_rh2 = calc_first(rh2[idx], [rule.lh])
+              first_rh = rh[idx] =~ /\A[a-z]\w*\Z/ ? calc_first(rh[idx], [rule.lh]) : [[rh[idx]]]
+              first_rh2 = rh2[idx] =~ /\A[a-z]\w*\Z/ ? calc_first(rh2[idx], [rule.lh]) : [[rh2[idx]]]
 
-              unless (first_rh & first_rh2).empty?
-                shared_sym = (first_rh & first_rh2)[0]
+              unless (matched_syms = first_rh.find_all{|first| first_rh2.find {|first2| first[-1] == first2[-1] }}).empty?
+                matched_syms2 = first_rh2.find_all{|first2| matched_syms.find{|syms| syms[-1] == first2[-1] }}
+
+                # 同じ記号が導出される過程がある場合、過程の短い方に絞る
+                (0...matched_syms.size-1).each {|k|
+                  (k+1...matched_syms.size).each{|l|
+                    if matched_syms[k][-1] == matched_syms[l][-1] && !(dupl = matched_syms[k] & matched_syms[l]).empty?
+                      if matched_syms[k].size < matched_syms[l].size
+                        matched_syms[k] = matched_syms[l] = matched_syms[k][0...dupl.size+1]
+                      else
+                        matched_syms[k] = matched_syms[l] = matched_syms[l][0...dupl.size+1]
+                      end
+                    end
+                  }
+                }
+
+                (0...matched_syms2.size-1).each {|k|
+                  (k+1...matched_syms2.size).each{|l|
+                    if matched_syms2[k][-1] == matched_syms2[l][-1] && !(dupl = matched_syms2[k] & matched_syms2[l]).empty?
+                      if matched_syms2[k].size < matched_syms2[l].size
+                        matched_syms2[k] = matched_syms2[l] = matched_syms2[k][0...dupl.size+1]
+                      else
+                        matched_syms2[k] = matched_syms2[l] = matched_syms2[l][0...dupl.size+1]
+                      end
+                    end
+                  }
+                }
+
+                matched_syms = matched_syms.uniq
+                matched_syms2 = matched_syms2.uniq
+
+                # 同じ記号が導出される過程を比較し、導出される過程の suffix の重複を除去する
+                matched_syms.each_with_index{|syms, k|
+                  next if (dupl_idx = matched_syms2.index{|sym| sym[-1] == syms[-1] }).nil?
+                  unless (dupl = syms & matched_syms2[dupl_idx]).empty?
+                    matched_syms[k] =  syms - dupl[1...dupl.size]
+                    matched_syms2[dupl_idx] = matched_syms2[dupl_idx] - dupl[1...dupl.size]
+                  end
+                }
+
+                matched_syms = matched_syms.uniq
+                matched_syms2 = matched_syms2.uniq
+
+                # 同じ記号が導出される過程を比較し、導出される過程の prefix の重複を除去する
+                (0...matched_syms.size-1).each {|k|
+                  (k+1...matched_syms.size).each{|l|
+                    if matched_syms[k].join.start_with?(matched_syms[l].join)
+                      matched_syms[l] = matched_syms[k]
+                    elsif matched_syms[l].join.start_with?(matched_syms[k].join)
+                      matched_syms[k] = matched_syms[l]
+                    end
+                  }
+                }
+
+                (0...matched_syms2.size-1).each {|k|
+                  (k+1...matched_syms2.size).each{|l|
+                    if matched_syms2[k].join.start_with?(matched_syms2[l].join)
+                      matched_syms2[k] = matched_syms2[l]
+                    elsif matched_syms2[l].join.start_with?(matched_syms2[k].join)
+                      matched_syms2[l] = matched_syms2[k]
+                    end
+                  }
+                }
+
+                matched_syms = matched_syms.find_all{|syms| matched_syms2.find {|syms2| syms2[-1] == syms[-1] }}
+                matched_syms2 = matched_syms2.find_all{|syms2| matched_syms.find {|syms| syms[-1] == syms2[-1] }}
+
+                matched_syms = matched_syms.uniq
+                matched_syms2 = matched_syms2.uniq
+
+                shared_sym = []
+                matched_syms.each{|sym| shared_sym.push sym[-1]}
+
                 puts "Conflicts may occur in \"#{rule.lh}\"."
-                puts "Both \"#{rh.join(" ")}\" and \"#{rh2.join(" ")}\" lead \"#{shared_sym}\"."
-                print "#{rh[idx]}"
-                first_rh[0..first_rh.index{|f| f == shared_sym}].each{|item|
-                  print " -> #{item}"
+                print "Both \"#{rh.join(" ")}\" and \"#{rh2.join(" ")}\" lead "
+                print "\"#{shared_sym[0]}\""
+                shared_sym[1...shared_sym.size].each{|sym|
+                  print ", \"#{sym}\""
                 }
-                puts ""
-                print "#{rh2[idx]}"
-                first_rh2[0..first_rh2.index{|f| f == shared_sym}].each{|item|
-                  print " -> #{item}"
-                }
-                puts ""
+                print ".\n"
 
+                matched_syms.each{|item|
+                  print "#{item[0]}"
+                #  if item[-1] == rh[idx]
+             #       puts ""
+             #       next
+                 # end
+                  item[1...item.size].each{|it|
+                    print " -> #{it}"
+                  }
+                  puts ""
+                }
+
+                matched_syms2.each{|item|
+                  print "#{item[0]}"
+         #         if item[-1] == rh2[idx]
+        #            puts ""
+        #            next
+         #         end
+                  item[1...item.size].each{|it|
+                    print " -> #{it}"
+                  }
+                  puts ""
+                }
               end
 =begin
               syms_rh = []
@@ -324,7 +413,8 @@ module RhOrderSolver
   end
 
   def calc_first lh, stack
-    return [] if lh =~ /[A-Z]\w*/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil? || stack.find{|st| st == lh }
+    return @first_set[lh] = [[lh]] if lh =~ /[A-Z]\w*/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil?
+    return [] if stack.find{|st| st == lh }
     return @first_set[lh] unless @first_set[lh].empty?
 
     tmp.rh.each{|r|
@@ -332,10 +422,12 @@ module RhOrderSolver
 
      case r[0]
      when /[a-z]\w*/
-       @first_set[lh] += [$&] + calc_first(r[0], stack + [lh])
+       calc_first(r[0], stack + [lh]).each{|el|
+         @first_set[lh] += [[lh] + el]
+       }
      when nil
      else
-       @first_set[lh].push r[0]
+       @first_set[lh].push [lh] + [r[0]]
      end
     }
 
