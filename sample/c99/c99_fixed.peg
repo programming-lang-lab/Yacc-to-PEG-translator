@@ -1,0 +1,504 @@
+grammar C99
+
+start <- SPACE translation_unit 
+       / SPACE 
+
+primary_expression <- IDENTIFIER 
+                    / CONSTANT 
+                    / STRING_LITERAL 
+                    / '(' SPACE compound_statement ')' SPACE 
+                    / '(' SPACE expression ')' SPACE 
+
+postfix_expression <- primary_expression ('[' SPACE expression ']' SPACE 
+                                        / '(' SPACE ')' SPACE 
+                                        / '(' SPACE argument_expression_list ')' SPACE 
+                                        / '.' SPACE IDENTIFIER 
+                                        / PTR_OP IDENTIFIER 
+                                        / INC_OP 
+                                        / DEC_OP)* 
+                    / '(' SPACE type_name ')' SPACE '{' SPACE initializer_list '}' SPACE ('[' SPACE expression ']' SPACE 
+                                                                                        / '(' SPACE ')' SPACE 
+                                                                                        / '(' SPACE argument_expression_list ')' SPACE 
+                                                                                        / '.' SPACE IDENTIFIER 
+                                                                                        / PTR_OP IDENTIFIER 
+                                                                                        / INC_OP 
+                                                                                        / DEC_OP)* 
+                    / '(' SPACE type_name ')' SPACE '{' SPACE initializer_list ',' SPACE '}' SPACE ('[' SPACE expression ']' SPACE 
+                                                                                                  / '(' SPACE ')' SPACE 
+                                                                                                  / '(' SPACE argument_expression_list ')' SPACE 
+                                                                                                  / '.' SPACE IDENTIFIER 
+                                                                                                  / PTR_OP IDENTIFIER 
+                                                                                                  / INC_OP 
+                                                                                                  / DEC_OP)* 
+
+argument_expression_list <- assignment_expression (',' SPACE assignment_expression)* 
+
+unary_expression <- postfix_expression 
+                  / INC_OP unary_expression 
+                  / DEC_OP unary_expression 
+                  / unary_operator cast_expression 
+                  / SIZEOF unary_expression 
+                  / SIZEOF '(' SPACE type_name ')' SPACE 
+
+unary_operator <- '&' SPACE 
+                / '*' SPACE 
+                / '+' SPACE 
+                / '-' SPACE 
+                / '~' SPACE 
+                / '!' SPACE 
+
+cast_expression <- '(' SPACE type_name ')' SPACE cast_expression
+                 / unary_expression
+
+multiplicative_expression <- cast_expression ('*' SPACE cast_expression 
+                                            / '/' SPACE cast_expression 
+                                            / '%' SPACE cast_expression)* 
+
+additive_expression <- multiplicative_expression ('+' SPACE multiplicative_expression 
+                                                / '-' SPACE multiplicative_expression)* 
+
+shift_expression <- additive_expression (LEFT_OP additive_expression 
+                                       / RIGHT_OP additive_expression)* 
+
+relational_expression <- shift_expression ('<' SPACE shift_expression 
+                                         / '>' SPACE shift_expression 
+                                         / LE_OP shift_expression 
+                                         / GE_OP shift_expression)* 
+
+equality_expression <- relational_expression (EQ_OP relational_expression 
+                                            / NE_OP relational_expression)* 
+
+and_expression <- equality_expression ('&' SPACE equality_expression)* 
+
+exclusive_or_expression <- and_expression ('^' SPACE and_expression)* 
+
+inclusive_or_expression <- exclusive_or_expression ('|' SPACE exclusive_or_expression)* 
+
+logical_and_expression <- inclusive_or_expression (AND_OP inclusive_or_expression)* 
+
+logical_or_expression <- logical_and_expression (OR_OP logical_and_expression)* 
+
+conditional_expression <- logical_or_expression '?' SPACE expression ':' SPACE conditional_expression 
+                        / logical_or_expression 
+
+assignment_expression <- unary_expression assignment_operator assignment_expression
+                       / conditional_expression
+
+assignment_operator <- '=' SPACE 
+                     / MUL_ASSIGN 
+                     / DIV_ASSIGN 
+                     / MOD_ASSIGN 
+                     / ADD_ASSIGN 
+                     / SUB_ASSIGN 
+                     / LEFT_ASSIGN 
+                     / RIGHT_ASSIGN 
+                     / AND_ASSIGN 
+                     / XOR_ASSIGN 
+                     / OR_ASSIGN 
+
+expression <- assignment_expression (',' SPACE assignment_expression)* 
+
+constant_expression <- conditional_expression 
+
+declaration <- declaration_specifiers ';' SPACE 
+             / declaration_specifiers init_declarator_list ';' SPACE %register_type_name
+
+declaration_specifiers <- storage_class_specifier declaration_specifiers 
+                        / storage_class_specifier 
+                        / type_specifier declaration_specifiers 
+                        / type_specifier 
+                        / type_qualifier declaration_specifiers 
+                        / type_qualifier 
+                        / function_specifier declaration_specifiers 
+                        / function_specifier 
+
+init_declarator_list <- init_declarator (',' SPACE init_declarator)* 
+
+init_declarator <- declarator '=' SPACE initializer 
+                 / declarator 
+
+storage_class_specifier <- TYPEDEF 
+                         / EXTERN 
+                         / STATIC 
+                         / AUTO 
+                         / REGISTER 
+
+type_specifier <- VOID 
+                / CHAR 
+                / SHORT 
+                / INT 
+                / LONG 
+                / FLOAT 
+                / DOUBLE 
+                / SIGNED 
+                / UNSIGNED 
+                / BOOL 
+                / COMPLEX 
+                / IMAGINARY 
+                / struct_or_union_specifier 
+                / enum_specifier 
+                / TYPE_NAME 
+
+struct_or_union_specifier <- struct_or_union IDENTIFIER '{' SPACE struct_declaration_list '}' SPACE
+                           / struct_or_union '{' SPACE struct_declaration_list '}' SPACE
+                           / struct_or_union IDENTIFIER
+
+struct_or_union <- STRUCT 
+                 / UNION 
+
+struct_declaration_list <- struct_declaration struct_declaration* 
+
+struct_declaration <- specifier_qualifier_list struct_declarator_list ';' SPACE 
+                    / specifier_qualifier_list ';' SPACE 
+
+specifier_qualifier_list <- type_specifier specifier_qualifier_list 
+                          / type_specifier 
+                          / type_qualifier specifier_qualifier_list 
+                          / type_qualifier 
+
+struct_declarator_list <- struct_declarator (',' SPACE struct_declarator)* 
+
+struct_declarator <- declarator ':' SPACE constant_expression 
+                   / ':' SPACE constant_expression 
+                   / declarator 
+
+enum_specifier <- ENUM '{' SPACE enumerator_list '}' SPACE 
+                / ENUM IDENTIFIER '{' SPACE enumerator_list '}' SPACE 
+                / ENUM '{' SPACE enumerator_list ',' SPACE '}' SPACE 
+                / ENUM IDENTIFIER '{' SPACE enumerator_list ',' SPACE '}' SPACE 
+                / ENUM IDENTIFIER 
+
+enumerator_list <- enumerator (',' SPACE enumerator)* 
+
+enumerator <- IDENTIFIER '=' SPACE constant_expression 
+            / IDENTIFIER 
+
+type_qualifier <- CONST 
+                / RESTRICT 
+                / VOLATILE 
+
+function_specifier <- INLINE 
+
+declarator <- pointer direct_declarator 
+            / direct_declarator 
+
+direct_declarator <- IDENTIFIER ('[' SPACE type_qualifier_list assignment_expression ']' SPACE
+                                                                      / '[' SPACE type_qualifier_list ']' SPACE 
+                                                                      / '[' SPACE assignment_expression ']' SPACE 
+                                                                      / '[' SPACE STATIC type_qualifier_list assignment_expression ']' SPACE 
+                                                                      / '[' SPACE type_qualifier_list STATIC assignment_expression ']' SPACE 
+                                                                      / '[' SPACE type_qualifier_list '*' SPACE ']' SPACE 
+                                                                      / '[' SPACE '*' SPACE ']' SPACE 
+                                                                      / '[' SPACE ']' SPACE 
+                                                                      / '(' SPACE parameter_type_list ')' SPACE 
+                                                                      / '(' SPACE identifier_list ')' SPACE 
+                                                                      / '(' SPACE ')' SPACE)* 
+                   / '(' SPACE declarator ')' SPACE ('[' SPACE type_qualifier_list assignment_expression ']' SPACE 
+                                                   / '[' SPACE type_qualifier_list ']' SPACE 
+                                                   / '[' SPACE assignment_expression ']' SPACE 
+                                                   / '[' SPACE STATIC type_qualifier_list assignment_expression ']' SPACE 
+                                                   / '[' SPACE type_qualifier_list STATIC assignment_expression ']' SPACE 
+                                                   / '[' SPACE type_qualifier_list '*' SPACE ']' SPACE 
+                                                   / '[' SPACE '*' SPACE ']' SPACE 
+                                                   / '[' SPACE ']' SPACE 
+                                                   / '(' SPACE parameter_type_list ')' SPACE 
+                                                   / '(' SPACE identifier_list ')' SPACE 
+                                                   / '(' SPACE ')' SPACE)* 
+
+pointer <- '*' SPACE type_qualifier_list pointer 
+         / '*' SPACE pointer 
+         / '*' SPACE type_qualifier_list 
+         / '*' SPACE 
+
+type_qualifier_list <- type_qualifier type_qualifier* 
+
+parameter_type_list <- parameter_list ',' SPACE ELLIPSIS 
+                     / parameter_list 
+
+parameter_list <- parameter_declaration (',' SPACE parameter_declaration)* 
+
+parameter_declaration <- declaration_specifiers declarator 
+                       / declaration_specifiers abstract_declarator 
+                       / declaration_specifiers 
+
+identifier_list <- IDENTIFIER (',' SPACE IDENTIFIER)* 
+
+type_name <- specifier_qualifier_list abstract_declarator 
+           / specifier_qualifier_list 
+
+abstract_declarator <- pointer direct_abstract_declarator 
+                     / direct_abstract_declarator 
+                     / pointer 
+
+direct_abstract_declarator <- '(' SPACE abstract_declarator ')' SPACE ('[' SPACE ']' SPACE 
+                                                                     / '[' SPACE assignment_expression ']' SPACE 
+                                                                     / '[' SPACE '*' SPACE ']' SPACE 
+                                                                     / '(' SPACE ')' SPACE 
+                                                                     / '(' SPACE parameter_type_list ')' SPACE)* 
+                            / '[' SPACE ']' SPACE ('[' SPACE ']' SPACE 
+                                                 / '[' SPACE assignment_expression ']' SPACE 
+                                                 / '[' SPACE '*' SPACE ']' SPACE 
+                                                 / '(' SPACE ')' SPACE 
+                                                 / '(' SPACE parameter_type_list ')' SPACE)* 
+                            / '[' SPACE assignment_expression ']' SPACE ('[' SPACE ']' SPACE 
+                                                                       / '[' SPACE assignment_expression ']' SPACE 
+                                                                       / '[' SPACE '*' SPACE ']' SPACE 
+                                                                       / '(' SPACE ')' SPACE 
+                                                                       / '(' SPACE parameter_type_list ')' SPACE)* 
+                            / '[' SPACE '*' SPACE ']' SPACE ('[' SPACE ']' SPACE 
+                                                           / '[' SPACE assignment_expression ']' SPACE 
+                                                           / '[' SPACE '*' SPACE ']' SPACE 
+                                                           / '(' SPACE ')' SPACE 
+                                                           / '(' SPACE parameter_type_list ')' SPACE)* 
+                            / '(' SPACE ')' SPACE ('[' SPACE ']' SPACE 
+                                                 / '[' SPACE assignment_expression ']' SPACE 
+                                                 / '[' SPACE '*' SPACE ']' SPACE 
+                                                 / '(' SPACE ')' SPACE 
+                                                 / '(' SPACE parameter_type_list ')' SPACE)* 
+                            / '(' SPACE parameter_type_list ')' SPACE ('[' SPACE ']' SPACE 
+                                                                     / '[' SPACE assignment_expression ']' SPACE 
+                                                                     / '[' SPACE '*' SPACE ']' SPACE 
+                                                                     / '(' SPACE ')' SPACE 
+                                                                     / '(' SPACE parameter_type_list ')' SPACE)* 
+
+initializer <- assignment_expression 
+             / '{' SPACE initializer_list '}' SPACE 
+             / '{' SPACE initializer_list ',' SPACE '}' SPACE 
+
+initializer_list <- designation initializer (',' SPACE initializer 
+                                           / ',' SPACE designation initializer)* 
+                  / initializer (',' SPACE initializer 
+                               / ',' SPACE designation initializer)* 
+
+designation <- designator_list '=' SPACE 
+
+designator_list <- designator designator* 
+
+designator <- '[' SPACE constant_expression ']' SPACE 
+            / '.' SPACE IDENTIFIER 
+
+statement <- labeled_statement 
+           / compound_statement 
+           / expression_statement 
+           / selection_statement 
+           / iteration_statement 
+           / jump_statement 
+
+labeled_statement <- IDENTIFIER ':' SPACE statement 
+                   / CASE constant_expression ':' SPACE statement 
+                   / DEFAULT ':' SPACE statement 
+
+compound_statement <- '{' SPACE '}' SPACE 
+                    / '{' SPACE block_item_list '}' SPACE 
+
+block_item_list <- block_item block_item* 
+
+block_item <- declaration 
+            / statement 
+
+expression_statement <- ';' SPACE 
+                      / expression ';' SPACE 
+
+selection_statement <- IF '(' SPACE expression ')' SPACE statement ELSE statement 
+                     / IF '(' SPACE expression ')' SPACE statement 
+                     / SWITCH '(' SPACE expression ')' SPACE statement 
+
+iteration_statement <- WHILE '(' SPACE expression ')' SPACE statement 
+                     / DO statement WHILE '(' SPACE expression ')' SPACE ';' SPACE 
+                     / FOR '(' SPACE expression_statement expression_statement ')' SPACE statement 
+                     / FOR '(' SPACE expression_statement expression_statement expression ')' SPACE statement 
+                     / FOR '(' SPACE declaration expression_statement ')' SPACE statement 
+                     / FOR '(' SPACE declaration expression_statement expression ')' SPACE statement 
+
+jump_statement <- GOTO IDENTIFIER ';' SPACE 
+                / CONTINUE ';' SPACE 
+                / BREAK ';' SPACE 
+                / RETURN ';' SPACE 
+                / RETURN expression ';' SPACE 
+
+translation_unit <- external_declaration external_declaration* 
+
+external_declaration <- function_definition 
+                      / declaration 
+
+function_definition <- declaration_specifiers declarator declaration_list compound_statement 
+                     / declaration_specifiers declarator compound_statement 
+
+declaration_list <- declaration declaration* 
+
+AUTO <- "auto" !WORD SPACE 
+
+BOOL <- "_Bool" !WORD SPACE 
+
+BREAK <- "break" !WORD SPACE 
+
+CASE <- "case" !WORD SPACE 
+
+CHAR <- "char" !WORD SPACE 
+
+COMPLEX <- "_Complex" !WORD SPACE 
+
+CONST <- "const" !WORD SPACE 
+
+CONTINUE <- "continue" !WORD SPACE 
+
+DEFAULT <- "default" !WORD SPACE 
+
+DO <- "do" !WORD SPACE 
+
+DOUBLE <- "double" !WORD SPACE 
+
+ELSE <- "else" !WORD SPACE 
+
+ENUM <- "enum" !WORD SPACE 
+
+EXTERN <- "extern" !WORD SPACE 
+
+FLOAT <- "float" !WORD SPACE 
+
+FOR <- "for" !WORD SPACE 
+
+GOTO <- "goto" !WORD SPACE 
+
+IF <- "if" !WORD SPACE 
+
+IMAGINARY <- "_Imaginary" !WORD SPACE 
+
+INLINE <- "inline" !WORD SPACE 
+
+INT <- "int" !WORD SPACE 
+
+LONG <- "long" !WORD SPACE 
+
+REGISTER <- "register" !WORD SPACE 
+
+RESTRICT <- "restrict" !WORD SPACE 
+
+RETURN <- "return" !WORD SPACE 
+
+SHORT <- "short" !WORD SPACE 
+
+SIGNED <- "signed" !WORD SPACE 
+
+SIZEOF <- "sizeof" !WORD SPACE 
+
+STATIC <- "static" !WORD SPACE 
+
+STRUCT <- "struct" !WORD SPACE 
+
+SWITCH <- "switch" !WORD SPACE 
+
+TYPEDEF <- "typedef" !WORD SPACE 
+
+UNION <- "union" !WORD SPACE 
+
+UNSIGNED <- "unsigned" !WORD SPACE 
+
+VOID <- "void" !WORD SPACE 
+
+VOLATILE <- "volatile" !WORD SPACE 
+
+WHILE <- "while" !WORD SPACE 
+
+IDENTIFIER <- !(AUTO 
+             / BOOL 
+             / BREAK 
+             / CASE 
+             / CHAR 
+             / COMPLEX 
+             / CONST 
+             / CONTINUE 
+             / DEFAULT 
+             / DO 
+             / DOUBLE 
+             / ELSE 
+             / ENUM 
+             / EXTERN 
+             / FLOAT 
+             / FOR 
+             / GOTO 
+             / IF 
+             / IMAGINARY 
+             / INLINE 
+             / INT 
+             / LONG 
+             / REGISTER 
+             / RESTRICT 
+             / RETURN 
+             / SHORT 
+             / SIGNED 
+             / SIZEOF 
+             / STATIC 
+             / STRUCT 
+             / SWITCH 
+             / TYPEDEF 
+             / UNION 
+             / UNSIGNED 
+             / VOID 
+             / VOLATILE 
+             / WHILE) [a-zA-Z_] ([a-zA-Z_] / [0-9])* SPACE 
+
+TYPE_NAME <- [a-zA-Z_] ([a-zA-Z_] / [0-9])* SPACE %distinguish_type_name
+
+CONSTANT <- "0" [xX] [a-fA-F0-9]+ (("ll" / "LL" / "l" / "L") ("u" / "U") / ("u" / "U")? ("ll" / "LL" / "l" / "L") / ("u" / "U"))? SPACE 
+          / "L"? "'" ("\\" [^\n] / [^\\\'\n])+ "'" SPACE 
+          / [0-9]+ ([Ee] [+\-]? [0-9]+) ("f" / "F" / "l" / "L")? SPACE 
+          / [0-9]* "." [0-9]+ ([Ee] [+\-]? [0-9]+)? ("f" / "F" / "l" / "L")? SPACE 
+          / [0-9]+ "." [0-9]* ([Ee] [+\-]? [0-9]+)? ("f" / "F" / "l" / "L")? SPACE 
+          / "0" [xX] [a-fA-F0-9]+ ([Pp] [+\-]? [0-9]+) ("f" / "F" / "l" / "L")? SPACE 
+          / "0" [xX] [a-fA-F0-9]* "." [a-fA-F0-9]+ ([Pp] [+\-]? [0-9]+)? ("f" / "F" / "l" / "L")? SPACE 
+          / "0" [xX] [a-fA-F0-9]+ "." [a-fA-F0-9]* ([Pp] [+\-]? [0-9]+)? ("f" / "F" / "l" / "L")? SPACE 
+          / "0" [0-7]* (("ll" / "LL" / "l" / "L") ("u" / "U") / ("u" / "U")? ("ll" / "LL" / "l" / "L") / ("u" / "U"))? SPACE 
+          / [1-9] [0-9]* (("ll" / "LL" / "l" / "L") ("u" / "U") / ("u" / "U")? ("ll" / "LL" / "l" / "L") / ("u" / "U"))? SPACE 
+
+STRING_LITERAL <- "L"? "\"" ("\\" [^\n] / [^\\\"\n])* "\"" SPACE 
+
+ELLIPSIS <- "..." SPACE 
+
+RIGHT_ASSIGN <- ">>=" SPACE 
+
+LEFT_ASSIGN <- "<<=" SPACE 
+
+ADD_ASSIGN <- "+=" SPACE 
+
+SUB_ASSIGN <- "-=" SPACE 
+
+MUL_ASSIGN <- "*=" SPACE 
+
+DIV_ASSIGN <- "/=" SPACE 
+
+MOD_ASSIGN <- "%=" SPACE 
+
+AND_ASSIGN <- "&=" SPACE 
+
+XOR_ASSIGN <- "^=" SPACE 
+
+OR_ASSIGN <- "|=" SPACE 
+
+RIGHT_OP <- ">>" SPACE 
+
+LEFT_OP <- "<<" SPACE 
+
+INC_OP <- "++" SPACE 
+
+DEC_OP <- "--" SPACE 
+
+PTR_OP <- "->" SPACE 
+
+AND_OP <- "&&" SPACE 
+
+OR_OP <- "||" SPACE 
+
+LE_OP <- "<=" SPACE 
+
+GE_OP <- ">=" SPACE 
+
+EQ_OP <- "==" SPACE 
+
+NE_OP <- "!=" SPACE 
+
+SPACE <- ("//" [^\n]* 
+        / [ \t\v\n\f])* 
+
+WORD <- [a-zA-Z_0-9] SPACE 
+
