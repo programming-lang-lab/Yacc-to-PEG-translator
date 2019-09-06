@@ -1,5 +1,5 @@
 # coding: utf-8
-require '../../sample/c99/c99_fixed.rb'
+require './sample/c99/c99_fixed.rb'
 
 class Actions
   def initialize
@@ -47,7 +47,7 @@ class Actions
 
   def distinguish_type_name(input, start, _end, elements)
     if @type_name_list.find{|item| item == elements[0].text+elements[1].text}
-      C99_canopy::TreeNode.new(input[start..._end], start, elements)
+      C99::TreeNode.new(input[start..._end], start, elements)
     else
       @failure
     end
