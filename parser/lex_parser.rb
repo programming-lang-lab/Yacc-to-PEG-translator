@@ -146,6 +146,7 @@ class LexParser < Parser
       
       @tmp_rule.rh.last.push rh
 
+      @@token_pairs.push ary if ary.size > 1
       ary.each{|str|
         @reserved_word_flag = true  if str =~ /\A#{@lex_id}\Z/
 

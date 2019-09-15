@@ -88,7 +88,9 @@ class Parser
   @@start_symbol = nil
   # 結合優先度の指定
   @@precedence = []
-  
+  # Lex 記述で同じ正規表現にマッチする終端記号の組
+  @@token_pairs = []
+
   def initialize input, *other
     if input.empty?
       puts "#{self.class.name} has no input."
@@ -101,7 +103,7 @@ class Parser
   end
     
   def parse
-    Translator.new @rules, @@skip_rule.lh, @@start_symbol, @@precedence
+    Translator.new @rules, @@skip_rule.lh, @@start_symbol, @@precedence, @@token_pairs
   end
 
   def string

@@ -46,7 +46,7 @@ class Generator
     code
   end
 
-  def join_repeat rpt, out_of_array
+  def join_repeat rpt, out_of_array = true
     code = send("join_#{rpt.rule.class.name.downcase}", rpt.rule)
     ary = rpt.rule
     if judge_param code, ary
@@ -57,7 +57,7 @@ class Generator
     code
   end
 
-  def join_negativelookahead neg, out_of_array
+  def join_negativelookahead neg, out_of_array = true
     code = send("join_#{neg.rule.class.name.downcase}", neg.rule)
     ary = neg.rule
     if judge_param code, ary
@@ -68,7 +68,7 @@ class Generator
     code
   end
   
-  def join_nilclass sym, out_of_array
+  def join_nilclass sym, out_of_array = true
     ""
   end
 

@@ -237,7 +237,8 @@ class YaccParser < Parser
 
       while action do end
     end
-    
+
+    @tmp_rule.rh[0].push '' if @tmp_rule.rh[0].empty?
     true
   end
 
