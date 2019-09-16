@@ -516,8 +516,6 @@ end
 module LeftRecursionsRemover
   def remove_left_recursions
     @grammar.each{|rule|
-      p rule.lh
-      p rule.rh.size
       check_left_recursion rule, [rule.lh]
     }
   end
@@ -733,13 +731,9 @@ class Translator
   # 終端記号の配列のインデックスを持つハッシュの生成
   def translate
     divide_rh
-    p "empty"
     remove_empty_rules
-    p "order"
     solve_rh_order
-    p "skip"
     insert_skip_symbol
-    p "left"
     remove_left_recursions
     #remove_unused_rules
     self
