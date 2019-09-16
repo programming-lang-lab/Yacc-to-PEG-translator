@@ -35,9 +35,10 @@ class Rule
   end
 end
 
-Repeat = Struct.new(:rule)
 Precedence = Struct.new(:type, :value)
+Repeat = Struct.new(:rule)
 NegativeLookAHead = Struct.new(:rule)
+OneOrMore = Struct.new(:rule)
 #Choice = Struct.new(:rule)
 
 class SkipRh

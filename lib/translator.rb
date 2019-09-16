@@ -61,7 +61,7 @@ module RhSeparater
           end
 
         # 演算子を含む場合
-        elsif rh.find{|sym| prio = @precedence.find_index{|prec| prec.find{|item| item.value == sym}}}
+        elsif rh.find{|sym| prio = @precedence.index{|prec| prec.find{|item| item.value == sym}}}
           if (tmp = not_shaped_rhs.find { |item| item.prio == prio })
             tmp.rh = tmp.rh + [rh] 
           else
@@ -98,73 +98,121 @@ module RhSeparater
     tmp_rule = Rule.new lh
     lh_with_idx = lh + idx_of_devined_rh.to_s
     lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
-    dividing_flag = false
+    #dividing_flag = false
 
     rh_first.rh.each{|rh|      
       if rh.size == 3 && rh[0] == lh && rh[2] == lh && rh_first.type == :left
-        dividing_flag = true
+        #dividing_flag = true
         rh[2] = lh_with_idx_next
       elsif rh.size == 3 && rh[0] == lh && rh[2] == lh && rh_first.type == :right
         dividing_flag = true
         rh[0] = lh_with_idx_next
-      #elsif rhs.type == :nonassoc
+      elsif rh_first.type == :nonassoc
+        rh.map!{|r|
+          if r == lh
+            #dividing_flag = true
+            lh_with_idx_next
+          else
+            r
+          end
+        }
       #elsif rhs.type == :precedence
+      #elsif rh_first.prio != max_of_prio
+      #  rh.map!{|r| r == lh ? lh_with_idx : r }
+      elsif rh.last == lh
+        rh[-1] = lh_with_idx
       else
       end
-      rh_stock.unshift rh
+      rh_stock.push rh
     }
 
-    if dividing_flag
-      rh_stock.push [lh_with_idx_next]
+    #if dividing_flag
+      rh_stock.unshift [lh_with_idx_next]
       tmp_rule.rh = rh_stock
       rh_stock = []
       idx_of_devined_rh += 1
       @grammar.insert idx, tmp_rule
       idx += 1
-    end
+    #end
 
     op_rhs.each{|rhs|
       if rh_stock.empty?
         tmp_rule = Rule.new(lh_with_idx = lh + idx_of_devined_rh.to_s)
         lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
-        dividing_flag = false
+        #dividing_flag = false
       end
 
       rhs.rh.each{|rh|
         if rh.size == 3 && rh[0] == lh && rh[2] == lh && rhs.type == :left
-          dividing_flag = true
+          #dividing_flag = true
           rh[0] = lh_with_idx if idx_of_devined_rh != 1
           rh[2] = lh_with_idx_next
         elsif rh.size == 3 && rh[0] == lh && rh[2] == lh && rhs.type == :right
-          dividing_flag = true
+          #dividing_flag = true
           rh[0] = lh_with_idx_next
           rh[2] = lh_with_idx if idx_of_devined_rh != 1
         elsif rhs.type == :nonassoc
           rh.map!{|r|
             if r == lh
-              dividing_flag = true
+              #dividing_flag = true
               lh_with_idx_next
             else
               r
             end
           }
         #elsif rhs.type == :precedence
+        # elsif rhs.prio != max_of_prio
+        # rh.map!{|r| r == lh ? lh_with_idx : r }
+          # 右再帰を含む右辺の場合、右辺の一番最後の記号である左辺はその右辺よりも優先度の低い右辺に還元されない
+          # e: e '+' t %prec SECOND
+          #  | '-' e %prec FIRST
+          #  | t
+          # この場合、'-' e の e は e '+' t が還元されたものになりえない
+        elsif rh.last == lh
+          rh[-1] = lh_with_idx
         else
+          if (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh.size > rh_idx+1
+              # 左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
+              # この場合 a A.Bの shift と B a A. の reduce で conflict が起こる
+              # 本来は shift 優先だがディレクティブによって reduce 優先になる
+              # a: a A B %prec THIRD
+              #  | a B   %prec SECOND
+              #  | B a A %prec FIRST
+              #  | C
+              #
+              # a <- a2 (A B)*
+              # a2 <- a3 (a2 B)*
+              # a3 <- a4
+              #     / B !(a A B) a A
+              # a4 <- C
+            if (rhs3 = op_rhs.find{|rhs2| rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }})
+              tmp_rh = rhs3.rh.find{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }
+              rh[rh_idx] = lh
+              rh.insert rh_idx, NegativeLookAHead.new([[lh] + tmp_rh[1...rh.size+1]])
+            end
+          end
         end
-        rh_stock.unshift rh
+        rh_stock.push rh
       }
       
-      if dividing_flag
-        rh_stock.push [lh_with_idx_next]
+      #if dividing_flag
+        rh_stock.unshift [lh_with_idx_next]
         tmp_rule.rh = rh_stock
         rh_stock = []
         idx_of_devined_rh += 1
         @grammar.insert idx, tmp_rule
         idx += 1
-      end
+      #end
     }
 
-    if rh_stock.empty?
+    if (rh_stock + no_op_rhs).empty?
+      case idx_of_devined_rh
+      when 1
+        @grammar.insert idx, Rule.new(lh, [[""]])
+      else
+        @grammar.insert idx, Rule.new(lh_with_idx_next, [[""]])
+      end
+    elsif rh_stock.empty?
       @grammar.insert idx, Rule.new(lh_with_idx_next, no_op_rhs)
     else
       case idx_of_devined_rh
@@ -468,18 +516,15 @@ end
 module LeftRecursionsRemover
   def remove_left_recursions
     @grammar.each{|rule|
-      check_left_recursion rule, [rule.lh], {}
+      p rule.lh
+      p rule.rh.size
+      check_left_recursion rule, [rule.lh]
     }
   end
   
   private
   # stackは辿った記号の配列
-  def check_left_recursion rule, stack, checked_rules
-    return {} if checked_rules.has_key?(rule.lh)
-    empty = rule.rh.find{|rh| rh[0] == ""} ? true : false
-    # ある文法規則の右辺の一番目の記号から空規則を導出できる場合に表示
-    puts "\"#{stack[0]}\" lead the empty rule of \"#{rule.lh}\".\nAnd, left recursion through empty rule may remain." if empty && stack[0] != rule.lh
-
+  def check_left_recursion rule, stack
     if rule.rh.find{|rh| rh[0] == rule.lh}
       # 直接左再帰
       remove_direct_left_recursion rule, rule.lh
@@ -491,7 +536,7 @@ module LeftRecursionsRemover
       when nil
         if rh[0] =~ /\A[a-z]\w*\Z/
           tmp = @grammar.find{|rl| rl.lh == rh[0]}
-          checked_rules.merge! check_left_recursion(tmp, stack+[rh[0]], checked_rules).to_h if tmp
+          check_left_recursion(tmp, stack+[rh[0]]) if tmp
         end
       else
         # 間接左再帰
@@ -500,8 +545,6 @@ module LeftRecursionsRemover
         break
       end
     }
-    checked_rules[rule.lh] = empty
-    checked_rules.uniq
   end
   
   # 文法規則の除去は全ての演算が終わった後に行う
@@ -527,7 +570,7 @@ module LeftRecursionsRemover
       case unmatched_rule.size
       # 再帰にならない右辺が空規則しかなく、空規則の除去器で空規則が除去されている場合
       when 0
-        rule.rh = [[Repeat.new(tmp_rule)]]
+        rule.rh = [[OneOrMore.new(tmp_rule)]]
       when 1
         rule.rh = [unmatched_rule[0].push(Repeat.new(tmp_rule))]
       else
@@ -544,7 +587,7 @@ module LeftRecursionsRemover
       if stack.empty?
         # 直接左再帰 
         remove_direct_left_recursion rule, st
-        check_left_recursion rule, [rule.lh], {}
+        check_left_recursion rule, [rule.lh]
         break
       else
         # 間接左再帰
@@ -617,7 +660,6 @@ module EmptyRulesRemover
         next unless (idx = rule.rh.index{|rh| rh[0] == "" })
         loop_flag = true
         # ruleに空規則しかない場合
-
         if (rh_size = rule.rh.size) == 1
           @grammar.delete_if{|rl| rl.lh == rule.lh}
         else
@@ -691,9 +733,13 @@ class Translator
   # 終端記号の配列のインデックスを持つハッシュの生成
   def translate
     divide_rh
+    p "empty"
     remove_empty_rules
+    p "order"
     solve_rh_order
+    p "skip"
     insert_skip_symbol
+    p "left"
     remove_left_recursions
     #remove_unused_rules
     self

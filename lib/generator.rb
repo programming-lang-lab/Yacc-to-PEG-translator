@@ -67,6 +67,17 @@ class Generator
     end    
     code
   end
+
+  def join_oneormore one, out_of_array = true
+    code = send("join_#{one.rule.class.name.downcase}", one.rule)
+    ary = one.rule
+    if judge_param code, ary
+      code = "(" + code.rstrip + ")+ "
+    else
+      code = code.rstrip + "* "
+    end
+    code
+  end
   
   def join_nilclass sym, out_of_array = true
     ""
