@@ -235,7 +235,7 @@ module RhOrderSolver
 #=begin
                   puts "Conflicts may occur in\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
                   #print "\"#{rule.lh} <- #{rh.join(" ")}\"\nand\n\"#{rule.lh} <- #{rh2.join(" ")}\"\n lead "
-                  print "Both rule lead \"#{matched_syms[0][0][0]}\""
+                  print "Both rules lead \"#{matched_syms[0][0][0]}\""
 
                   matched_syms[1...matched_syms.size].each{|sym|
                     print ", \"#{sym[0][0]}\""
@@ -243,16 +243,16 @@ module RhOrderSolver
                   print ".\n"
 
                   matched_syms.each{|item|
-                    print "#{item[1][0][0]}"
-                    item[1][1...item[1].size].each{|it|
-                      print " <- #{it[0]}"
+                    print "#{item[1][1][0]}"
+                    item[1][2...item[1].size].each{|it|
+                      print " -> #{it[0]}"
                     }
                     puts ""
                   }
                   matched_syms2.each{|item|
-                    print "#{item[1][0][0]}"
-                    item[1][1...item[1].size].each{|it|
-                      print " <- #{it[0]}"
+                    print "#{item[1][1][0]}"
+                    item[1][2...item[1].size].each{|it|
+                      print " -> #{it[0]}"
                     }
                     puts ""
                   }
