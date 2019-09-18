@@ -211,7 +211,8 @@ class YaccParser < Parser
         break
       end
     end
-    
+
+    @tmp_rule.rh.map!{|rh| rh.empty? ? [''] : rh }
     if (tmp = @rules.find { |rl| rl.lh == @tmp_rule.lh })
       tmp.rh = tmp.rh + @tmp_rule.rh
     else
@@ -238,7 +239,6 @@ class YaccParser < Parser
       while action do end
     end
 
-    @tmp_rule.rh[0].push '' if @tmp_rule.rh[0].empty?
     true
   end
 
