@@ -76,7 +76,7 @@ class LexParser < Parser
   private
   def constant
     return false unless (tmp = string)
-    @const[tmp] = regexp
+    @const[tmp] = regexp.gsub("\\", "\\\\\\\\")
     @const.each{|k, v| @const[tmp].gsub!(/{#{k}}/, v)}
     true
   end
@@ -233,8 +233,7 @@ class LexParser < Parser
   def class_char
     if @input =~ /\A\[(\\\]|[^\]])*\]/
       @input = $'
-
-      return $&.gsub(/([^\w])-/){"#{$1}\\-"}.gsub(/(?!\\'|\\")(\\'|'|\\"|")/){"\\#{$1}"}
+      return $&.gsub(/([^\w])-/){"#{$1}\\-"}.gsub(/(?!\\'|\\")('|")/){"\\#{$1}"}
     end
 
     false
@@ -245,9 +244,7 @@ class LexParser < Parser
       @input = $'
       ret = $&
       # 定数の除去
-      @const.each{|k, v|
-        break if ret.gsub!(/{#{k}}/, v)
-      }
+      @const.each{|k, v| break if ret.gsub!("{#{k}}", v) }
       return ret
     end
 
