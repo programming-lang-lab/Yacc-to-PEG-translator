@@ -183,12 +183,12 @@ module RhSeparater
               # a <- a2 (A B)*
               # a2 <- a3 (a2 B)*
               # a3 <- a4
-              #     / B !(a A B) a A
+              #     / B !(a2 A B) a A
               # a4 <- C
-            if (rhs3 = op_rhs.find{|rhs2| rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }})
-              tmp_rh = rhs3.rh.find{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }
-              rh[rh_idx] = lh
-              rh.insert rh_idx, NegativeLookAHead.new([[lh] + tmp_rh[1...rh.size+1]])
+            if (op_rhs_idx = op_rhs.index{|rhs2| rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }})
+              tmp_rh = op_rhs[op_rhs_idx].rh.find{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }
+              tmp_rh0 = lh + (op_rhs_idx+2).to_s
+              rh.insert rh_idx, NegativeLookAHead.new([[tmp_rh0] + tmp_rh[1...rh.size+1]])
             end
           end
         end
@@ -261,6 +261,7 @@ module RhOrderSolver
                 first_rh2 = rh2[idx] =~ /\A[a-z]\w*\Z/ ? calc_first(rh2[idx], idx, []).map{|s| [[rule.lh, -1]]+s } : [[[rule.lh, -1], [rh2[idx], idx]]]
                 first_rh.delete_if{|first| first[1...first.size].find{|f| f[0] == first[0][0] }}
                 first_rh2.delete_if{|first| first[1...first.size].find{|f| f[0] == first[0][0] }}
+                rh_pos = rh2_pos = idx
 
                 unless (matched_syms = first_rh.find_all{|first| first_rh2.find {|first2| first[-1][0] == first2[-1][0] }}).empty?
                   matched_syms2 = first_rh2.find_all{|first2| matched_syms.find{|syms| syms[-1][0] == first2[-1][0] }}
@@ -282,7 +283,6 @@ module RhOrderSolver
                   matched_syms2.map!{|syms| [[syms[-1][0]], syms]}
 #=begin
                   puts "Conflicts may occur in\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
-                  #print "\"#{rule.lh} <- #{rh.join(" ")}\"\nand\n\"#{rule.lh} <- #{rh2.join(" ")}\"\n lead "
                   print "Both rules lead \"#{matched_syms[0][0][0]}\""
 
                   matched_syms[1...matched_syms.size].each{|sym|
@@ -313,10 +313,14 @@ module RhOrderSolver
                     tmp_matched_syms2 = []
                     matched_syms.each {|syms|
                       next if syms[-1][0].empty?
-                      tmp = calc_follow(syms[1...syms.size])
-
-                      if tmp.empty?
-                        tmp_matched_syms += [syms + [[[]]]]
+                      if (tmp = calc_follow(syms[1...syms.size])).empty?
+                        rh_pos += 1
+                        if rh_pos < rh.size
+                          tmp = calc_first(rh[rh_pos], rh_pos, [rule.lh])
+                          tmp.each{|el| tmp_matched_syms += [syms + [el]] }
+                        else
+                          tmp_matched_syms += [syms + [[[]]]]
+                        end
                       else
                         tmp.each{|el| tmp_matched_syms += [syms + [el]] }
                       end
@@ -324,14 +328,18 @@ module RhOrderSolver
 
                     matched_syms2.each {|syms|
                       next if syms[-1][0].empty?
-                      tmp = calc_follow(syms[1...syms.size])
-                      if tmp.empty?
-                        tmp_matched_syms2 += [syms[0...syms.size-1] + [[[]]]]
+                      if (tmp = calc_follow(syms[1...syms.size])).empty?
+                        rh2_pos += 1
+                        if rh2_pos < rh2.size
+                          tmp = calc_first(rh2[rh2_pos], rh2_pos, [rule.lh])
+                          tmp.each{|el| tmp_matched_syms2 += [syms + [el]] }
+                        else
+                          tmp_matched_syms2 += [syms + [[[]]]]
+                        end
                       else
                         tmp.each{|el| tmp_matched_syms2 += [syms + [el]] }
                       end
-                    }
-
+                     }
                     # 同じ記号が導出される過程を比較し、導出される過程の suffix の重複を除去する
                     tmp_matched_syms.each_with_index{|syms, k|
                       next if (dupl_idx = tmp_matched_syms2.index{|sym| sym[0] == syms[0] && sym.last[-1][0] == syms.last[-1][0] }).nil?
@@ -359,39 +367,37 @@ module RhOrderSolver
                     matched_syms2 = matched_syms2.uniq
 
                     break if matched_syms.empty? && matched_syms2.empty? || matched_syms.reject{|syms| syms.last[0].empty?}.empty? && matched_syms2.reject{|syms2| syms2.last[0].empty?}.empty?
-#=begin
-                    p "bar"
-                    p rule.lh
-                    p rh
-                    p rh2
-                     matched_syms.each{|syms| p syms[0]} if matched_syms.size < 1000#.each{|syms| p syms[0]}
-                    p "bar2"
-                     matched_syms2.each{|syms| p syms[0]} if matched_syms2.size < 1000#.each{|syms| p syms[0]}
-#=end
-                  end
-p "end"
-                  #p matched_syms.each{|syms| p syms[0]} unless matched_syms.empty? && matched_syms2.empty?
-                  #p matched_syms2.each{|syms| p syms[0]} unless matched_syms.empty? && matched_syms2.empty?
-                  matched_syms.each{|sym_rh|
-                    matched_syms2.each{|sym_rh2|
-                      p "hoge"
 
-                      p sym_rh[0]
-                      p sym_rh2[0]
-                      if sym_rh[0] != sym_rh2[0] && (sym_rh2[0] & sym_rh[0]) == sym_rh[0]
-                        p rule.rh[i]
-                        p rule.rh[j]
-                        p sym_rh
-                        p sym_rh2
-                        rule.rh[i], rule.rh[j] = rule.rh[j], rule.rh[i]
-                        break_flag = true
-                      end
-                      break if break_flag
+                    swap_idx = 0
+                    matched_syms.each{|sym_rh|
+                      matched_syms2.each{|sym_rh2|
+                        next if sym_rh[0] == sym_rh2[0]
+                        tmp_idx = 0
+                        while sym_rh[0].size > tmp_idx && sym_rh2[0].size > tmp_idx && sym_rh[0][tmp_idx] == sym_rh2[0][tmp_idx]
+                          tmp_idx += 1
+                        end
+                        if sym_rh[0].size == tmp_idx
+                          swap_idx += 1
+                        elsif sym_rh2[0].size == tmp_idx
+                          swap_idx -= 1
+                        end
+                      }
                     }
+                    if swap_idx > 0
+                      p "xxxxxxx"
+                      p matched_syms
+                      p matched_syms2
+                      p rule.rh[i]
+                      p rule.rh[j]
+                      rule.rh[i], rule.rh[j] = rule.rh[j], rule.rh[i]
+                      break_flag = true
+                    end
+                    matched_syms.delete_if{|syms| syms.last[0].empty?}
+                    matched_syms2.delete_if{|syms| syms.last[0].empty?}
                     break if break_flag
-                  }
-=end
+                  end
                   break if break_flag
+=end
                 end
               end
             end
@@ -447,7 +453,7 @@ p "end"
     return @follow_set[first_el.join] if @follow_set.has_key?(first_el.join)
     el = first_el.pop
     idx = @token_pairs.index{|item| item.join == el[0] }
-    until first_el.empty?
+    while first_el.size > 1
       break_flag = true
       rule = @grammar.find { |rl| rl.lh == first_el.last[0] }
 
@@ -514,35 +520,42 @@ p "end"
 end
 
 module LeftRecursionsRemover
-  def remove_left_recursions
+  def check_indirect_left_recursions
     @grammar.each{|rule|
-      check_left_recursion rule, [rule.lh]
+      redo unless check_indirect_left_recursion rule, [rule.lh]
+      #check_indirect_left_recursion rule, [rule.lh]
     }
   end
-  
+
+  def remove_direct_left_recursions
+    @grammar.each{|rule|
+      if rule.rh.find{|rh| rh[0] == rule.lh}
+        # 直接左再帰
+        remove_direct_left_recursion rule, rule.lh
+      end
+    }
+  end
+
   private
   # stackは辿った記号の配列
-  def check_left_recursion rule, stack
-    if rule.rh.find{|rh| rh[0] == rule.lh}
-      # 直接左再帰
-      remove_direct_left_recursion rule, rule.lh
-    end
-
+  def check_indirect_left_recursion rule, stack
     rule.rh.each{|rh|
+      next if rule.lh == rh[0]
       idx = stack.index{|st| st == rh[0]}
       case idx
       when nil
         if rh[0] =~ /\A[a-z]\w*\Z/
-          tmp = @grammar.find{|rl| rl.lh == rh[0]}
-          check_left_recursion(tmp, stack+[rh[0]]) if tmp
+          next unless (tmp = @grammar.find{|rl| rl.lh == rh[0]})
+          return false unless check_indirect_left_recursion(tmp, stack+[rh[0]])
         end
       else
         # 間接左再帰
         remove_indirect_left_recursion rule, stack[idx...stack.size]
         # ここでbreakすることで文法規則が変換された後に変換前のスタックに基づいて左再帰の検出が行われることを防ぐ
-        break
+        return false
       end
     }
+    true
   end
   
   # 文法規則の除去は全ての演算が終わった後に行う
@@ -579,28 +592,34 @@ module LeftRecursionsRemover
   end
 
   def remove_indirect_left_recursion rule, stack
-    stack.size.times{
+    (stack.size-1).times{
       st = stack.pop
-      
-      if stack.empty?
-        # 直接左再帰 
-        remove_direct_left_recursion rule, st
-        check_left_recursion rule, [rule.lh]
-        break
-      else
-        # 間接左再帰
-        # 代入される文法規則
-        assigned_rule = @grammar.find{|rl| rl.lh == stack.last}
-        
-        # 代入される記号の検索
-        matched_rule = assigned_rule.rh.find_all{|rh| rh[0] == st}
-        unmatched_rule = assigned_rule.rh.reject{|rh| rh[0] == st}
 
-        tmp_rule = []
-        matched_rule.each{|rl| tmp_rule.push rl[1...rl.size]}
-        
-        tmp_rule = tmp_rule[0] if tmp_rule.size == 1
-        
+      # 間接左再帰
+      # 代入される文法規則
+      assigned_rule = @grammar.find{|rl| rl.lh == stack.last}
+
+      # 代入される記号の検索
+      matched_rule = assigned_rule.rh.find_all{|rh| rh[0] == st}
+      unmatched_rule = assigned_rule.rh.reject{|rh| rh[0] == st}
+
+      tmp_rule = []
+      matched_rule.each{|rl| tmp_rule.push rl[1...rl.size]}
+      tmp_rule = tmp_rule[0] if tmp_rule.size == 1
+      case tmp_rule.empty?
+      when true
+        case rule.rh.size
+        when 1
+          case rule.rh[0].size
+          when 1
+            assigned_rule.rh = [rule.rh[0][0]] + unmatched_rule
+          else
+            assigned_rule.rh = [rule.rh[0]] + unmatched_rule
+          end
+        else
+          assigned_rule.rh = [[rule.rh]] + unmatched_rule
+        end
+      else
         case rule.rh.size
         when 1
           case rule.rh[0].size
@@ -612,10 +631,9 @@ module LeftRecursionsRemover
         else
           assigned_rule.rh = [[rule.rh] + tmp_rule] + unmatched_rule
         end
-        
-        # 代入される文法規則
-        rule = flatten_rule(assigned_rule)
       end
+      # 代入される文法規則
+      rule = flatten_rule(assigned_rule)
     }
   end
 
@@ -657,6 +675,7 @@ module EmptyRulesRemover
       @grammar.each{|rule|
         next unless (idx = rule.rh.index{|rh| rh[0] == "" })
         loop_flag = true
+
         # ruleに空規則しかない場合
         if (rh_size = rule.rh.size) == 1
           @grammar.delete_if{|rl| rl.lh == rule.lh}
@@ -698,6 +717,16 @@ module EmptyRulesRemover
   end
 end
 
+module UnusedRulesRemover
+  def remove_unused_rules
+    used_lhs = []
+    delete_lhs = []
+    @grammar.each{|rule| rule.rh.each{|rh| rh.each{|r| used_lhs.push r unless used_lhs.include?(r) }}}
+    @grammar[1...@grammar.size].each{|rule| delete_lhs.push rule.lh unless used_lhs.include?(rule.lh) }
+    @grammar.delete_if{|rule| delete_lhs.include?(rule.lh)}
+  end
+end
+
 class Translator
   attr_accessor :grammar, :start_symbol
 
@@ -706,6 +735,7 @@ class Translator
   include RhOrderSolver
   include LeftRecursionsRemover
   include EmptyRulesRemover
+  include UnusedRulesRemover
 
   def initialize rules, skip_lh, start_symbol, precedence, token_pairs
     @grammar = rules
@@ -732,10 +762,14 @@ class Translator
   def translate
     divide_rh
     remove_empty_rules
+    check_indirect_left_recursions
+=begin
+
+    remove_unused_rules
     solve_rh_order
     insert_skip_symbol
-    remove_left_recursions
-    #remove_unused_rules
+    remove_direct_left_recursions
+=end
     self
   end
 end
