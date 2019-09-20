@@ -163,12 +163,12 @@ module RhSeparater
         #elsif rhs.type == :precedence
         # elsif rhs.prio != max_of_prio
         # rh.map!{|r| r == lh ? lh_with_idx : r }
-          # 右再帰を含む右辺の場合、右辺の一番最後の記号である左辺はその右辺よりも優先度の低い右辺に還元されない
+          # 右再帰を含む左結合の右辺の場合、右辺の一番最後の記号である左辺はその右辺よりも優先度の低い右辺に還元されない
           # e: e '+' t %prec SECOND
           #  | '-' e %prec FIRST
           #  | t
           # この場合、'-' e の e は e '+' t が還元されたものになりえない
-        elsif rh.last == lh
+        elsif rh.last == lh && rhs.type != :right
           rh[-1] = lh_with_idx
         else
           if (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh.size > rh_idx+1
@@ -309,10 +309,16 @@ module RhOrderSolver
                   # 全ての受理可能な入力の導出
 =begin
                   loop do
+                    p "afdgafh"
+                    p matched_syms.size
+                    p matched_syms2.size
                     tmp_matched_syms = []
                     tmp_matched_syms2 = []
                     matched_syms.each {|syms|
-                      next if syms[-1][0].empty?
+                      if syms[-1][0].empty?
+                        tmp_matched_syms += [syms]
+                        next
+                      end
                       if (tmp = calc_follow(syms[1...syms.size])).empty?
                         rh_pos += 1
                         if rh_pos < rh.size
@@ -360,43 +366,42 @@ module RhOrderSolver
                     matched_syms = tmp_matched_syms.uniq
                     matched_syms2 = tmp_matched_syms2.uniq
 
-                    matched_syms.delete_if{|syms| matched_syms2.find{|syms2| syms2[0].join.start_with?(syms[0].join) }.nil?}
-                    matched_syms2.delete_if{|syms2| matched_syms.find{|syms| syms2[0].join.start_with?(syms[0].join) }.nil?}
+                    #matched_syms.delete_if{|syms| matched_syms2.find{|syms2| syms2[0].join.start_with?(syms[0].join) }.nil?}
+                    #matched_syms2.delete_if{|syms2| matched_syms.find{|syms| syms2[0].join.start_with?(syms[0].join) }.nil?}
 
-                    matched_syms = matched_syms.uniq
-                    matched_syms2 = matched_syms2.uniq
-
-                    break if matched_syms.empty? && matched_syms2.empty? || matched_syms.reject{|syms| syms.last[0].empty?}.empty? && matched_syms2.reject{|syms2| syms2.last[0].empty?}.empty?
-
-                    swap_idx = 0
-                    matched_syms.each{|sym_rh|
-                      matched_syms2.each{|sym_rh2|
-                        next if sym_rh[0] == sym_rh2[0]
-                        tmp_idx = 0
-                        while sym_rh[0].size > tmp_idx && sym_rh2[0].size > tmp_idx && sym_rh[0][tmp_idx] == sym_rh2[0][tmp_idx]
-                          tmp_idx += 1
-                        end
-                        if sym_rh[0].size == tmp_idx
-                          swap_idx += 1
-                        elsif sym_rh2[0].size == tmp_idx
-                          swap_idx -= 1
-                        end
-                      }
-                    }
-                    if swap_idx > 0
-                      p "xxxxxxx"
-                      p matched_syms
-                      p matched_syms2
-                      p rule.rh[i]
-                      p rule.rh[j]
-                      rule.rh[i], rule.rh[j] = rule.rh[j], rule.rh[i]
-                      break_flag = true
-                    end
-                    matched_syms.delete_if{|syms| syms.last[0].empty?}
-                    matched_syms2.delete_if{|syms| syms.last[0].empty?}
-                    break if break_flag
+                    break if matched_syms.empty? && matched_syms2.empty? || matched_syms.reject{|syms| syms.last[0].empty?}.empty? || matched_syms2.reject{|syms2| syms2.last[0].empty?}.empty?
+                    #break if break_flag
                   end
-                  break if break_flag
+                  #break if break_flag
+
+                  p "smjjfsk"
+                  p rule.rh[i]
+                  p rule.rh[j]
+                  p matched_syms.size
+                  p matched_syms2.size
+                  matched_syms.each{|sym_rh|
+                    matched_syms.delete_if{|sym_rh2| sym_rh == sym_rh2 } if matched_syms2.size > matched_syms2.delete_if{|sym_rh2| sym_rh == sym_rh2 }.size
+                  }
+                  matched_syms.each{|sym_rh|
+                    matched_syms2.each{|sym_rh2|
+                      next if sym_rh[0] == sym_rh2[0]
+                      tmp_idx = 0
+                      while sym_rh[0].size > tmp_idx && sym_rh2[0].size > tmp_idx && sym_rh[0][tmp_idx] == sym_rh2[0][tmp_idx]
+                        tmp_idx += 1
+                      end
+                      if sym_rh[0].size == tmp_idx
+                        p "xxxxxxx"
+                        p matched_syms
+                        p matched_syms2
+                        p rule.rh[i]
+                        p rule.rh[j]
+                        rule.rh[i], rule.rh[j] = rule.rh[j], rule.rh[i]
+                        break_flag = true
+                        break if break_flag
+                      end
+                    }
+                    break if break_flag
+                  }
 =end
                 end
               end
@@ -763,13 +768,10 @@ class Translator
     divide_rh
     remove_empty_rules
     check_indirect_left_recursions
-=begin
-
     remove_unused_rules
     solve_rh_order
     insert_skip_symbol
     remove_direct_left_recursions
-=end
     self
   end
 end
