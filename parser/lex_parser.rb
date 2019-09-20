@@ -32,7 +32,7 @@ class LexParser < Parser
 
     while !check_token("\\s*%%") && token do end
 
-    unless (id_rule = @rules.find{|rh| rh.lh == @lex_id }).nil?
+    unless (id_rule = @rules.find{|rh| rh.lh == @lex_id }).nil? || @reserved_words.empty?
       if id_rule.rh.size == 1
         id_rule.rh[0].unshift NegativeLookAHead.new @reserved_words
       else
