@@ -15,6 +15,7 @@ lex_description = nil
 lex_filename = nil
 filename = nil
 lex_id = nil
+format_name = nil
 
 ARGV.each_with_index{|arg, idx|
   case arg
@@ -24,10 +25,12 @@ ARGV.each_with_index{|arg, idx|
     lex_filename = ARGV[idx+1]
   # when /\A-p\Z/
     # peg_description = PEGParser.new open(ARGV[idx+1], encoding: 'utf-8').read
-  when /\A-o\Z/
+  when /\A-o\Z/, /\A--output\Z/
     filename = ARGV[idx+1]
-  when /\A-i\Z/, /\A--id\Z/
+  when /\A-i\Z/, /\A--identifier\Z/
     lex_id = ARGV[idx+1]
+  when /\A--format\Z/
+    format_name = ARGV[idx+1]
   else
     # type code here
   end
@@ -49,15 +52,24 @@ elsif lex_description
   grammar.translate
 end
 
-case filename
-when /\w\.rats/
+case format_name
+when /canopy/
+  peg = CanopyGenerator.new grammar
+when /packcc/
+  peg = PackCCGenerator.new grammar
+when /rats/
   peg = RatsGenerator.new grammar
-when /\w\.(treetop|tt)/
+when /treetop|tt/
   peg = TreetopGenerator.new grammar
 else
-#  peg = PEGGenerator.new grammar
-#  peg = PackCCGenerator.new grammar
-  peg = CanopyGenerator.new grammar
+  case filename
+  when /\w\.rats/
+    peg = RatsGenerator.new grammar
+  when /\w\.(treetop|tt)/
+    peg = TreetopGenerator.new grammar
+  else
+    peg = PEGGenerator.new grammar
+  end
 end
 
 peg.generate filename
