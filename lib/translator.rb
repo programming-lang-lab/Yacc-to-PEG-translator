@@ -160,7 +160,7 @@ module RhSeparater
               r
             end
           }
-        #elsif rhs.type == :precedence
+        # elsif rhs.type == :precedence
         # elsif rhs.prio != max_of_prio
         # rh.map!{|r| r == lh ? lh_with_idx : r }
           # 右再帰を含む左結合の右辺の場合、右辺の一番最後の記号である左辺はその右辺よりも優先度の低い右辺に還元されない
@@ -170,27 +170,25 @@ module RhSeparater
           # この場合、'-' e の e は e '+' t が還元されたものになりえない
         elsif rh.last == lh && rhs.type != :right
           rh[-1] = lh_with_idx
+
+          # 左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
+          # この場合 a A.Bの shift と B a A. の reduce で conflict が起こる
+          # 本来は shift 優先だがディレクティブによって reduce 優先になる
+          # a: a A B %prec THIRD
+          #  | a B   %prec SECOND
+          #  | B a A %prec FIRST
+          #  | C
+          #
+          # a <- a2 (A B)*
+          # a2 <- a3 (a2 B)*
+          # a3 <- a4
+          #     / B !(a2 A B) a A
+          # a4 <- C
+        elsif (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh.size > rh_idx+1 && (op_rhs_idx = op_rhs.index{|rhs2| rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }})
+          tmp_rh = op_rhs[op_rhs_idx].rh.find{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }
+          tmp_rh0 = lh + (op_rhs_idx+2).to_s
+          rh.insert rh_idx, NegativeLookAHead.new([[tmp_rh0] + tmp_rh[1...rh.size+1]])
         else
-          if (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh.size > rh_idx+1
-              # 左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
-              # この場合 a A.Bの shift と B a A. の reduce で conflict が起こる
-              # 本来は shift 優先だがディレクティブによって reduce 優先になる
-              # a: a A B %prec THIRD
-              #  | a B   %prec SECOND
-              #  | B a A %prec FIRST
-              #  | C
-              #
-              # a <- a2 (A B)*
-              # a2 <- a3 (a2 B)*
-              # a3 <- a4
-              #     / B !(a2 A B) a A
-              # a4 <- C
-            if (op_rhs_idx = op_rhs.index{|rhs2| rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }})
-              tmp_rh = op_rhs[op_rhs_idx].rh.find{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }
-              tmp_rh0 = lh + (op_rhs_idx+2).to_s
-              rh.insert rh_idx, NegativeLookAHead.new([[tmp_rh0] + tmp_rh[1...rh.size+1]])
-            end
-          end
         end
         rh_stock.push rh
       }
