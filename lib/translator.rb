@@ -61,7 +61,8 @@ module RhSeparater
           end
 
         # 演算子を含む場合
-        elsif rh.find{|sym| prio = @precedence.index{|prec| prec.find{|item| item.value == sym}}}
+        # Yacc では文法規則の末尾の字句の優先度がその文法規則の優先度になる
+        elsif rh.reverse.find{|sym| prio = @precedence.index{|prec| prec.find{|item| item.value == sym}}}
           if (tmp = not_shaped_rhs.find { |item| item.prio == prio })
             tmp.rh = tmp.rh + [rh] 
           else
@@ -98,109 +99,81 @@ module RhSeparater
     tmp_rule = Rule.new lh
     lh_with_idx = lh + idx_of_devined_rh.to_s
     lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
-    #dividing_flag = false
 
-    rh_first.rh.each{|rh|      
-      if rh.size == 3 && rh[0] == lh && rh[2] == lh && rh_first.type == :left
-        #dividing_flag = true
-        rh[2] = lh_with_idx_next
-      elsif rh.size == 3 && rh[0] == lh && rh[2] == lh && rh_first.type == :right
-        dividing_flag = true
-        rh[0] = lh_with_idx_next
-      elsif rh_first.type == :nonassoc
-        rh.map!{|r|
-          if r == lh
-            #dividing_flag = true
-            lh_with_idx_next
-          else
-            r
-          end
-        }
-      #elsif rhs.type == :precedence
-      #elsif rh_first.prio != max_of_prio
-      #  rh.map!{|r| r == lh ? lh_with_idx : r }
-      elsif rh.last == lh
-        rh[-1] = lh_with_idx
+    rh_first.rh.each{|rh|
+      case rh_first.type
+      when :left
+        next if rh.size == 1
+        rh[1...rh.size].map!{|r| r == lh ? lh_with_idx_next : r }
+      when :right
+        next if rh.size == 1
+        rh[0...rh.size-1].map!{|r| r == lh ? lh_with_idx_next : r }
+      when :nonassoc
+        rh.map!{|r| r == lh ? lh_with_idx_next : r }
+      when :precedence
       else
+        # type code here
       end
       rh_stock.push rh
     }
 
-    #if dividing_flag
+    rh_stock.unshift [lh_with_idx_next]
+    tmp_rule.rh = rh_stock
+    rh_stock = []
+    idx_of_devined_rh += 1
+    @grammar.insert idx, tmp_rule
+    idx += 1
+
+    op_rhs.each{|rhs|
+      if rh_stock.empty?
+        tmp_rule = Rule.new(lh_with_idx = lh + idx_of_devined_rh.to_s)
+        lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
+      end
+
+      rhs.rh.each{|rh|
+        case rhs.type
+        when :left
+          next if rh.size == 1
+          rh[0] = lh_with_idx if idx_of_devined_rh != 1
+          rh[1...rh.size].map!{|r| r == lh ? lh_with_idx_next : r }
+        when :right
+          next if rh.size == 1
+          rh[-1] = lh_with_idx if idx_of_devined_rh != 1
+          rh[0...rh.size-1].map!{|r| r == lh ? lh_with_idx_next : r }
+        when :nonassoc
+          rh.map!{|r| r == lh ? lh_with_idx_next : r }
+        when :precedence
+        else
+          # type code here
+        end
+        # 左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
+        # この場合 a A.Bの shift と B a A. の reduce で conflict が起こる
+        # 本来は shift 優先だがディレクティブによって reduce 優先になる
+        # a: a A B %prec THIRD
+        #  | a B   %prec SECOND
+        #  | B a A %prec FIRST
+        #  | C
+        #
+        # a <- a2 (A B)*
+        # a2 <- a3 (a2 B)*
+        # a3 <- a4
+        #     / B !(a2 A B) a A
+        # a4 <- C
+        if (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh.size > rh_idx+1 && (op_rhs_idx = op_rhs.index{|rhs2| rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }})
+          tmp_rh = op_rhs[op_rhs_idx].rh.find{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }
+          tmp_rh0 = lh + (op_rhs_idx+2).to_s
+          rh.insert rh_idx, NegativeLookAHead.new([[tmp_rh0] + tmp_rh[1...rh.size+1]])
+        end
+
+        rh_stock.push rh
+      }
+
       rh_stock.unshift [lh_with_idx_next]
       tmp_rule.rh = rh_stock
       rh_stock = []
       idx_of_devined_rh += 1
       @grammar.insert idx, tmp_rule
       idx += 1
-    #end
-
-    op_rhs.each{|rhs|
-      if rh_stock.empty?
-        tmp_rule = Rule.new(lh_with_idx = lh + idx_of_devined_rh.to_s)
-        lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
-        #dividing_flag = false
-      end
-
-      rhs.rh.each{|rh|
-        if rh.size == 3 && rh[0] == lh && rh[2] == lh && rhs.type == :left
-          #dividing_flag = true
-          rh[0] = lh_with_idx if idx_of_devined_rh != 1
-          rh[2] = lh_with_idx_next
-        elsif rh.size == 3 && rh[0] == lh && rh[2] == lh && rhs.type == :right
-          #dividing_flag = true
-          rh[0] = lh_with_idx_next
-          rh[2] = lh_with_idx if idx_of_devined_rh != 1
-        elsif rhs.type == :nonassoc
-          rh.map!{|r|
-            if r == lh
-              #dividing_flag = true
-              lh_with_idx_next
-            else
-              r
-            end
-          }
-        # elsif rhs.type == :precedence
-        # elsif rhs.prio != max_of_prio
-        # rh.map!{|r| r == lh ? lh_with_idx : r }
-          # 右再帰を含む左結合の右辺の場合、右辺の一番最後の記号である左辺はその右辺よりも優先度の低い右辺に還元されない
-          # e: e '+' t %prec SECOND
-          #  | '-' e %prec FIRST
-          #  | t
-          # この場合、'-' e の e は e '+' t が還元されたものになりえない
-        elsif rh.last == lh && rhs.type != :right
-          rh[-1] = lh_with_idx
-
-          # 左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
-          # この場合 a A.Bの shift と B a A. の reduce で conflict が起こる
-          # 本来は shift 優先だがディレクティブによって reduce 優先になる
-          # a: a A B %prec THIRD
-          #  | a B   %prec SECOND
-          #  | B a A %prec FIRST
-          #  | C
-          #
-          # a <- a2 (A B)*
-          # a2 <- a3 (a2 B)*
-          # a3 <- a4
-          #     / B !(a2 A B) a A
-          # a4 <- C
-        elsif (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh.size > rh_idx+1 && (op_rhs_idx = op_rhs.index{|rhs2| rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }})
-          tmp_rh = op_rhs[op_rhs_idx].rh.find{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }
-          tmp_rh0 = lh + (op_rhs_idx+2).to_s
-          rh.insert rh_idx, NegativeLookAHead.new([[tmp_rh0] + tmp_rh[1...rh.size+1]])
-        else
-        end
-        rh_stock.push rh
-      }
-      
-      #if dividing_flag
-        rh_stock.unshift [lh_with_idx_next]
-        tmp_rule.rh = rh_stock
-        rh_stock = []
-        idx_of_devined_rh += 1
-        @grammar.insert idx, tmp_rule
-        idx += 1
-      #end
     }
 
     if (rh_stock + no_op_rhs).empty?
@@ -280,7 +253,7 @@ module RhOrderSolver
                   matched_syms.map!{|syms| [[syms[-1][0]], syms]}
                   matched_syms2.map!{|syms| [[syms[-1][0]], syms]}
 #=begin
-                  puts "Conflicts may occur in\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
+                  puts "Order of right hand side may be wrong in\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
                   print "Both rules lead \"#{matched_syms[0][0][0]}\""
 
                   matched_syms[1...matched_syms.size].each{|sym|
