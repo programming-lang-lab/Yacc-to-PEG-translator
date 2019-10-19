@@ -104,10 +104,14 @@ module RhSeparater
       case rh_first.type
       when :left
         next if rh.size == 1
-        rh[1...rh.size].map!{|r| r == lh ? lh_with_idx_next : r }
+        (1...rh.size).each{|i|
+          rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
+        }
       when :right
         next if rh.size == 1
-        rh[0...rh.size-1].map!{|r| r == lh ? lh_with_idx_next : r }
+        (0...rh.size-1).each{|i|
+          rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
+        }
       when :nonassoc
         rh.map!{|r| r == lh ? lh_with_idx_next : r }
       when :precedence
@@ -120,8 +124,10 @@ module RhSeparater
     rh_stock.unshift [lh_with_idx_next]
     tmp_rule.rh = rh_stock
     rh_stock = []
+    rh_recursion = []
     idx_of_devined_rh += 1
     @grammar.insert idx, tmp_rule
+    first_idx = idx
     idx += 1
 
     op_rhs.each{|rhs|
@@ -135,18 +141,22 @@ module RhSeparater
         when :left
           next if rh.size == 1
           rh[0] = lh_with_idx if rh[0] == lh
-          (1...rh.size).each{|idx|
-            rh[idx] = (rh[idx] == lh ? lh_with_idx_next : rh[idx])
+          (1...rh.size).each{|i|
+            rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
           }
         when :right
           next if rh.size == 1
           rh[-1] = lh_with_idx if rh[-1] == lh
-          (0...rh.size-1).each{|idx|
-            rh[idx] = (rh[idx] == lh ? lh_with_idx_next : rh[idx])
+          (0...rh.size-1).each{|i|
+            rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
           }
         when :nonassoc
           rh.map!{|r| r == lh ? lh_with_idx_next : r }
         when :precedence
+          if rh[0] == lh
+            rh_recursion.push rh
+            next
+          end
         else
           # type code here
         end
@@ -172,12 +182,21 @@ module RhSeparater
         rh_stock.push rh
       }
 
-      rh_stock.unshift [lh_with_idx_next]
-      tmp_rule.rh = rh_stock
-      rh_stock = []
-      idx_of_devined_rh += 1
-      @grammar.insert idx, tmp_rule
-      idx += 1
+      unless rh_recursion.empty?
+        rh_recursion.each_with_index{|rec, rec_idx|
+          @grammar[first_idx].rh.insert rec_idx+1, rec
+        }
+        rh_recursion = []
+      end
+
+      unless rh_stock.empty?
+        rh_stock.unshift [lh_with_idx_next]
+        tmp_rule.rh = rh_stock
+        rh_stock = []
+        idx_of_devined_rh += 1
+        @grammar.insert idx, tmp_rule
+        idx += 1
+      end
     }
 
     if (rh_stock + no_op_rhs).empty?
@@ -502,7 +521,8 @@ end
 module LeftRecursionsRemover
   def check_indirect_left_recursions
     @grammar.each{|rule|
-      redo unless check_indirect_left_recursion rule, [rule.lh]
+      #redo unless check_indirect_left_recursion rule, [rule.lh]
+      check_indirect_left_recursion rule, [rule.lh]
     }
   end
 
@@ -583,7 +603,7 @@ module LeftRecursionsRemover
       unmatched_rule = assigned_rule.rh.reject{|rh| rh[0] == st}
 
       tmp_rule = []
-      matched_rule.each{|rl| tmp_rule.push rl[1...rl.size]}
+      matched_rule.each{|rl| tmp_rule.push rl[1...rl.size] if rl.size > 1 }
       tmp_rule = tmp_rule[0] if tmp_rule.size == 1
       case tmp_rule.empty?
       when true
@@ -654,7 +674,6 @@ module EmptyRulesRemover
       @grammar.each{|rule|
         next unless (idx = rule.rh.index{|rh| rh[0] == "" })
         loop_flag = true
-
         # ruleに空規則しかない場合
         if (rh_size = rule.rh.size) == 1
           @grammar.delete_if{|rl| rl.lh == rule.lh}
