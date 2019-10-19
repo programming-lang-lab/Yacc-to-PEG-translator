@@ -134,12 +134,16 @@ module RhSeparater
         case rhs.type
         when :left
           next if rh.size == 1
-          rh[0] = lh_with_idx if idx_of_devined_rh != 1
-          rh[1...rh.size].map!{|r| r == lh ? lh_with_idx_next : r }
+          rh[0] = lh_with_idx if rh[0] == lh
+          (1...rh.size).each{|idx|
+            rh[idx] = (rh[idx] == lh ? lh_with_idx_next : rh[idx])
+          }
         when :right
           next if rh.size == 1
-          rh[-1] = lh_with_idx if idx_of_devined_rh != 1
-          rh[0...rh.size-1].map!{|r| r == lh ? lh_with_idx_next : r }
+          rh[-1] = lh_with_idx if rh[-1] == lh
+          (0...rh.size-1).each{|idx|
+            rh[idx] = (rh[idx] == lh ? lh_with_idx_next : rh[idx])
+          }
         when :nonassoc
           rh.map!{|r| r == lh ? lh_with_idx_next : r }
         when :precedence
@@ -499,7 +503,6 @@ module LeftRecursionsRemover
   def check_indirect_left_recursions
     @grammar.each{|rule|
       redo unless check_indirect_left_recursion rule, [rule.lh]
-      #check_indirect_left_recursion rule, [rule.lh]
     }
   end
 
