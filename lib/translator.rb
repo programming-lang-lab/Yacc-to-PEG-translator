@@ -103,12 +103,10 @@ module RhSeparater
     rh_first.rh.each{|rh|
       case rh_first.type
       when :left
-        next if rh.size == 1
         (1...rh.size).each{|i|
           rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
         }
       when :right
-        next if rh.size == 1
         (0...rh.size-1).each{|i|
           rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
         }
@@ -124,10 +122,8 @@ module RhSeparater
     rh_stock.unshift [lh_with_idx_next]
     tmp_rule.rh = rh_stock
     rh_stock = []
-    rh_recursion = []
     idx_of_devined_rh += 1
     @grammar.insert idx, tmp_rule
-    first_idx = idx
     idx += 1
 
     op_rhs.each{|rhs|
@@ -138,28 +134,18 @@ module RhSeparater
 
       rhs.rh.each{|rh|
         case rhs.type
-        when :left
-          next if rh.size == 1
+        when :left, :precedence
           rh[0] = lh_with_idx if rh[0] == lh
-          (1...rh.size).each{|i|
-            rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
-          }
+          rh[-1] = lh_with_idx_next if rh[-1] == lh
         when :right
-          next if rh.size == 1
+          rh[0] = lh_with_idx_next if rh[0] == lh
           rh[-1] = lh_with_idx if rh[-1] == lh
-          (0...rh.size-1).each{|i|
-            rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
-          }
         when :nonassoc
           rh.map!{|r| r == lh ? lh_with_idx_next : r }
-        when :precedence
-          if rh[0] == lh
-            rh_recursion.push rh
-            next
-          end
         else
-          # type code here
+          puts "It is wrong type."
         end
+
         # 左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
         # この場合 a A.Bの shift と B a A. の reduce で conflict が起こる
         # 本来は shift 優先だがディレクティブによって reduce 優先になる
@@ -173,22 +159,18 @@ module RhSeparater
         # a3 <- a4
         #     / B !(a2 A B) a A
         # a4 <- C
-        if (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh.size > rh_idx+1 && (op_rhs_idx = op_rhs.index{|rhs2| rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }})
-          tmp_rh = op_rhs[op_rhs_idx].rh.find{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }
-          tmp_rh0 = lh + (op_rhs_idx+2).to_s
-          rh.insert rh_idx, NegativeLookAHead.new([[tmp_rh0] + tmp_rh[1...rh.size+1]])
+        if (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh_idx != rh.size-1
+          rh_negative = []
+          op_rhs.each_with_index{|rhs2, rhs2_idx|
+            if rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }
+              tmp_rh = op_rhs[rhs2_idx].rh.find_all{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }.map{|item| item[1...item.size]}
+              rh_negative.push [lh + (rhs2_idx+2).to_s] + [tmp_rh]
+            end
+          }
+          rh.insert rh_idx, NegativeLookAHead.new(rh_negative) unless rh_negative.empty?
         end
-
         rh_stock.push rh
       }
-
-      unless rh_recursion.empty?
-        rh_recursion.each_with_index{|rec, rec_idx|
-          @grammar[first_idx].rh.insert rec_idx+1, rec
-        }
-        rh_recursion = []
-      end
-
       unless rh_stock.empty?
         rh_stock.unshift [lh_with_idx_next]
         tmp_rule.rh = rh_stock
@@ -196,6 +178,20 @@ module RhSeparater
         idx_of_devined_rh += 1
         @grammar.insert idx, tmp_rule
         idx += 1
+      end
+    }
+
+    # no_op_rhs で左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
+    no_op_rhs.each{|no_op_rh|
+      if (rh_idx = no_op_rh.index{|r| r == lh }) && rh_idx != 0 && rh_idx != no_op_rh.size-1
+        rh_negative = []
+        op_rhs.each_with_index{|rhs2, rhs2_idx|
+          if rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }
+            tmp_rh = op_rhs[rhs2_idx].rh.find_all{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }.map{|item| item[1...item.size]}
+            rh_negative.push [lh + (rhs2_idx+2).to_s] + [tmp_rh]
+          end
+        }
+        no_op_rh.insert rh_idx, NegativeLookAHead.new(rh_negative) unless rh_negative.empty?
       end
     }
 
@@ -671,14 +667,14 @@ module EmptyRulesRemover
     loop do
       loop_flag = false
 
-      @grammar.each{|rule|
+      @grammar[1...@grammar.size].each{|rule|
         next unless (idx = rule.rh.index{|rh| rh[0] == "" })
         loop_flag = true
         # ruleに空規則しかない場合
         if (rh_size = rule.rh.size) == 1
           @grammar.delete_if{|rl| rl.lh == rule.lh}
         else
-          rule.rh.delete_at(idx){|rh| rh[0] == "" }
+          rule.rh.delete_at(idx)
         end
         @grammar.each{|rule2|
           next if rule.lh == rule2.lh
@@ -694,7 +690,12 @@ module EmptyRulesRemover
             next unless rh.find{|r| r == rule.lh}
 
             # 空規則を除去して他の文法規則で空規則が発生する場合
-            tmp_rh = [""] if (tmp_rh = rh.reject{|r| r == rule.lh}).empty?
+            if (tmp_rh = rh.reject{|r| r == rule.lh}).empty?
+              tmp_rh = [""]
+              # 空規則の直前に否定先読みがある場合
+            else
+              tmp_rh.pop if tmp_rh.last.is_a?(NegativeLookAHead)
+            end
             # ruleに空規則しかない場合に他の文法規則に現れるその規則を全て削除
             if rh_size == 1
               rule2.rh[rh_idx] = tmp_rh
