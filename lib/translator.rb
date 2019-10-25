@@ -677,8 +677,6 @@ module EmptyRulesRemover
           rule.rh.delete_at(idx)
         end
         @grammar.each{|rule2|
-          next if rule.lh == rule2.lh
-
           # 空規則を含む右辺にマッチしたとき、右辺を増やすため1つの右辺の処理を飛ばす必要がある
           skip_flag = false
 
@@ -692,6 +690,12 @@ module EmptyRulesRemover
             # 空規則を除去して他の文法規則で空規則が発生する場合
             if (tmp_rh = rh.reject{|r| r == rule.lh}).empty?
               tmp_rh = [""]
+              # 空規則の除去して右辺に左辺と一致しているものが発生する場合に削除
+              # stmts <- stmt
+              #        / stmts stmt
+              #        / stmts
+            elsif tmp_rh.size == 1 && tmp_rh[0] == rule2.lh
+              next
               # 空規則の直前に否定先読みがある場合
             else
               tmp_rh.pop if tmp_rh.last.is_a?(NegativeLookAHead)
