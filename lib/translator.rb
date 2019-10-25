@@ -687,36 +687,67 @@ module EmptyRulesRemover
             end
             next unless rh.find{|r| r == rule.lh}
 
-            # 空規則を除去して他の文法規則で空規則が発生する場合
-            if (tmp_rh = rh.reject{|r| r == rule.lh}).empty?
-              tmp_rh = [""]
-              # 空規則の除去して右辺に左辺と一致しているものが発生する場合に削除
-              # stmts <- stmt
-              #        / stmts stmt
-              #        / stmts
-            elsif tmp_rh.size == 1 && tmp_rh[0] == rule2.lh
-              next
-              # 空規則の直前に否定先読みがある場合
-            else
-              tmp_rh.pop if tmp_rh.last.is_a?(NegativeLookAHead)
-            end
-            # ruleに空規則しかない場合に他の文法規則に現れるその規則を全て削除
-            if rh_size == 1
-              rule2.rh[rh_idx] = tmp_rh
-            else
-              if idx == 0
-                rule2.rh.insert(rh_idx, tmp_rh)
+            matched_idx = 0
+            rh.each_with_index{|r, r_idx|
+              if r == rule.lh
+                tmp_rh = rh[0...r_idx] + rh[r_idx+1...rh.size]
               else
-                rule2.rh.insert(rh_idx+1, tmp_rh)
+                next
               end
-              skip_flag = true
-            end
+
+              # 空規則を除去して他の文法規則で空規則が発生する場合
+              if tmp_rh.empty?
+                tmp_rh = [""]
+                # 空規則の除去して右辺に左辺と一致しているものが発生する場合に削除
+                # stmts <- stmt
+                #        / stmts stmt
+                #        / stmts
+              elsif tmp_rh.size == 1
+                # 無限ループを検出した場合に文法規則の右辺に挿入しない
+                if tmp_rh[0] == rule2.lh
+                  next
+                else
+                  next if check_infinite_loop [rule2.lh]+tmp_rh
+                end
+
+                # 空規則の直前に否定先読みがある場合
+              else
+                tmp_rh.pop if tmp_rh.last.is_a?(NegativeLookAHead)
+              end
+              # ruleに空規則しかない場合に他の文法規則に現れるその規則を全て削除
+              if rh_size == 1
+                rule2.rh[rh_idx] = tmp_rh
+              else
+                if idx == 0
+                  rule2.rh.insert(rh_idx+matched_idx, tmp_rh)
+                else
+                  rule2.rh.insert(rh_idx+matched_idx+1, tmp_rh)
+                end
+                skip_flag = true
+              end
+              matched_idx += 1
+            }
           }
           rule2.rh = rule2.rh.uniq
         }
       }
       break unless loop_flag
     end
+  end
+
+  private
+  def check_infinite_loop stack
+    return false unless (rule = @grammar.find{|rule| rule.lh == stack.last})
+
+    rule.rh.find_all{|rh| rh.size == 1 && rh[0] =~ /\A[a-z]\w*\Z/}.each{|rh|
+
+      if stack.find{|st| st == rh[0]}
+        return true
+      else
+        return true if check_infinite_loop stack+rh
+      end
+    }
+    false
   end
 end
 
