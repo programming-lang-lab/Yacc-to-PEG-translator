@@ -16,7 +16,7 @@ class LexParser < Parser
     # c_comment: Cのコメントを除くメソッド
     # space: 空白文字を除くメソッド
     before_hook_methods = [[[:space, :c_comment],
-                            [:option, :option_x, :option_s, :macro, :constant, :token_tag, :action]],
+                            [:option, :option_x, :option_s, :code, :constant, :token_type, :action]],
                                                                                  
                            [[:space],
                             [:regexp, :string]]]
@@ -25,14 +25,14 @@ class LexParser < Parser
   end
 
   def parse
-    while option || option_s || option_x || macro || constant do end
+    while option || option_s || option_x || code || constant do end
     space
     check_token "%%"
     space
 
     while !check_token("\\s*%%") && token do end
 
-    unless (id_rule = @rules.find{|rh| rh.lh == @lex_id }).nil? || @reserved_words.empty?
+    unless (id_rule = @rules.find {|rh| rh.lh == @lex_id }).nil? || @reserved_words.empty?
       if id_rule.rh.size == 1
         id_rule.rh[0].unshift NegativeLookAHead.new @reserved_words
       else
@@ -108,7 +108,7 @@ class LexParser < Parser
     true
   end
   
-  def macro
+  def code
     return false unless check_token "%{"
     until check_token("%}") do
       check_token "[^\n]*\n"
@@ -117,7 +117,7 @@ class LexParser < Parser
   end
   
   def token
-    if (tags = token_tag)
+    if (tags = token_type)
       tags.each{|tag| tag.upcase! }
     else
       tags = ["INITIAL"] 
@@ -193,7 +193,7 @@ class LexParser < Parser
     true
   end
   
-  def token_tag
+  def token_type
     if @input =~ /\A<[^<>]+>/
       @input = $'
       return $&.scan(/\w+/)
@@ -274,20 +274,15 @@ class LexParser < Parser
       @input = $'
       return "[^\\n]"
     end
-#    return "[^\\n]" if check_token "\\."
+
     false
   end
 
   def nonwrapped_string
-#    p "hoge"
-#    p @input[0...10]
-    if @input =~ /\A(\\"|'|\\\\|\\\(|\\\)|\\{|\\}|\\\[|\\\]|\\\$|\\\?|=|\\>|\\<|\\!|\\\||\\\+|\\\*|\\\^|\\~|\\|\/|;|:|,|@|#|>|<|-|&|\^|%|\w)+/
-
+    if @input =~ /\A(\\"|'|\\\\|\\\(|\\\)|\\{|\\}|\\\[|\\\]|\\\$|\\\?|=|\\>|\\<|\\!|\\\.|\\\||\\\+|\\\*|\\\^|\\~|\\|\/|;|:|,|@|#|>|<|-|&|\^|%|\w)+/
     # if @input =~ /\A(\\\"|\\\'|\\\\|\\\.|\\\(|\\\)|\\\{|\\\}|\\\[|\\\]|\\\$|\\\?|=|\\>|\\<|\\!|\\\||\\\+|\\\*|\\^|\\~|\\|\/|;|:|,|@|#|>|<|\-|&|\^|%|\w)+/
       @input = $'
-#    p @input[0...10]
-  #      return "\"" + $&.gsub(//, ) + "\""
-      return "\"" + $& + "\""
+      return "\"" + $&.gsub(/\\([!<>|+*^\/.])/, '\1') + "\""
     end
 
     false

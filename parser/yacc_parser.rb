@@ -8,12 +8,12 @@ class YaccParser < Parser
     # space: 空白文字を除くメソッド
     before_hook_methods = [[[:space, :c_comment],
                             [:token,
-                             :token_tag,
+                             :token_type,
                              :type,
                              :start,
                              :debug,
                              :union,
-                             :macro,
+                             :code,
                              :expect,
                              :precedence,
                              :nonassoc,
@@ -37,9 +37,11 @@ class YaccParser < Parser
   end
 
   def parse
-    while token || type || start || debug || union || macro || expect || pure_parser || lex_param || parse_param || initial_action || right || left || precedence || nonassoc do end
+    while token || type || start || debug || union || code || expect || pure_parser || lex_param || parse_param || initial_action || right || left || precedence || nonassoc do
+    end
     space
     check_token "%%"
+
     grammars
     space
     check_token "%%"
@@ -49,11 +51,11 @@ class YaccParser < Parser
   private
   def token
     return false unless check_token("%token")
-    while token_tag && space && check_token("[^%\\s][^\\s]*") do end
+    while token_type && space && check_token("[^%\\s][^\\s]*") do end
     true
   end
   
-  def token_tag
+  def token_type
     check_token("<\\w+>")
     true
   end
@@ -79,8 +81,8 @@ class YaccParser < Parser
     @input.sub!(/(?<paren>{('[^']*'|"[^"]*"|[^{}'"]+|\g<paren>)*})\s*/, '')
   end
   
-  def macro
-    check_token("%{(?~%})%}")
+  def code
+    check_token("(%(code\s*(requires|provides|top|imports)?\s*)?{)(?~%})%}")
   end
   
   def expect
@@ -116,6 +118,7 @@ class YaccParser < Parser
   def left
     return false unless check_token("%left")
     prec = []
+    token_type
     while (tmp = string || literal)
       prec.push Precedence.new(:left, tmp)
     end
@@ -126,6 +129,7 @@ class YaccParser < Parser
   def right
     return false unless check_token("%right")
     prec = []
+    token_type
     while (tmp = string || literal)
       prec.push Precedence.new(:right, tmp)
     end
@@ -136,6 +140,7 @@ class YaccParser < Parser
   def nonassoc
     return false unless check_token("%nonassoc")
     prec = []
+    token_type
     while (tmp = string || literal)
       prec.push Precedence.new(:nonassoc, tmp)
     end
@@ -146,6 +151,7 @@ class YaccParser < Parser
   def precedence
     return false unless check_token("%precedence")
     prec = []
+    token_type
     while (tmp = string || literal)
       prec.push Precedence.new(:precedence, tmp)
     end
@@ -170,10 +176,18 @@ class YaccParser < Parser
   def grammars
     @@start_symbol = @input[/\w+/] if @@start_symbol.nil?
 
-    if @@skip_rule.rh.empty?
-      @input = "start\n  : #{@@start_symbol}\n  ;\n\n" + @input
+    if @@start_symbol == "start"
+      if @@skip_rule.rh.empty?
+        @input = "start_symbol\n  : #{@@start_symbol}\n  ;\n\n" + @input
+      else
+        @input = "start_symbol\n  : #{@@skip_rule.lh} #{@@start_symbol}\n  | #{@@skip_rule.lh}\n  ;\n\n" + @input
+      end
     else
-      @input = "start\n  : #{@@skip_rule.lh} #{@@start_symbol}\n  | #{@@skip_rule.lh}\n  ;\n\n" + @input
+      if @@skip_rule.rh.empty?
+        @input = "start\n  : #{@@start_symbol}\n  ;\n\n" + @input
+      else
+        @input = "start\n  : #{@@skip_rule.lh} #{@@start_symbol}\n  | #{@@skip_rule.lh}\n  ;\n\n" + @input
+      end
     end
 
     while grammar do end
@@ -191,10 +205,6 @@ class YaccParser < Parser
   def lh
     # lhの記号が重複しないか検査
     return false unless (str = string).is_a?(String)
-    if @rules.any?{|item| item.lh == str}
-      puts "#{str} is already decleared."
-      exit 1
-    end
     
     @tmp_rule = Rule.new
     @tmp_rule.lh = str

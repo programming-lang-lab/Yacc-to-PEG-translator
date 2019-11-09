@@ -272,7 +272,7 @@ module RhOrderSolver
                   matched_syms.map!{|syms| [[syms[-1][0]], syms]}
                   matched_syms2.map!{|syms| [[syms[-1][0]], syms]}
 #=begin
-                  puts "Order of right hand side may be wrong in\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
+                  puts "Order of right hand side may be wrong.\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
                   print "Both rules lead \"#{matched_syms[0][0][0]}\""
 
                   matched_syms[1...matched_syms.size].each{|sym|
