@@ -1,7 +1,7 @@
 # coding: utf-8
 module SkipSymbolInserter
   def insert_skip_symbol
-    return unless @grammar.find { |rule| rule.lh == @skip_lh }
+    return unless @grammar.any? { |rule| rule.lh == @skip_lh }
 
     @grammar.each{|rule|
       case rule.lh
@@ -50,8 +50,8 @@ module RhSeparater
       rule.rh.each{|rh|
         prio = 0
 
-        if (prec_idx = rh.find_index{|sym| sym == "%prec" })
-          puts "rh doesn't have operand." unless (prio = @precedence.find_index{|prec| prec.find{|item| item.value == rh[prec_idx+1]}})
+        if (prec_idx = rh.index{|sym| sym == "%prec" })
+          puts "rh doesn't have operand." unless (prio = @precedence.index{|prec| prec.any?{|item| item.value == rh[prec_idx+1]}})
           rh.slice!(prec_idx, 2)
 
           if (tmp = not_shaped_rhs.find { |item| item.prio == prio })
@@ -62,7 +62,7 @@ module RhSeparater
 
         # 演算子を含む場合
         # Yacc では文法規則の末尾の字句の優先度がその文法規則の優先度になる
-        elsif rh.reverse.find{|sym| prio = @precedence.index{|prec| prec.find{|item| item.value == sym}}}
+        elsif rh.reverse.any?{|sym| prio = @precedence.index{|prec| prec.any?{|item| item.value == sym}}}
           if (tmp = not_shaped_rhs.find { |item| item.prio == prio })
             tmp.rh = tmp.rh + [rh] 
           else
@@ -91,44 +91,20 @@ module RhSeparater
   def shape_rh lh, op_rhs, no_op_rhs, idx
     # 演算子の位置に関係なく演算子の優先度の高い方の結合度を高くする．
     op_rhs.sort!{|a, b| a.prio <=> b.prio }
-    max_of_prio = op_rhs.max{|a, b| a.prio <=> b.prio}.prio
-    rh_first = op_rhs.shift
     idx_of_devined_rh = 1
     # 右辺に再帰が現れなかった場合に次の優先度の演算子を持つ右辺に対して使用
     rh_stock = []
     tmp_rule = Rule.new lh
     lh_with_idx = lh + idx_of_devined_rh.to_s
     lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
-
-    rh_first.rh.each{|rh|
-      case rh_first.type
-      when :left
-        (1...rh.size).each{|i|
-          rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
-        }
-      when :right
-        (0...rh.size-1).each{|i|
-          rh[i] = (rh[i] == lh ? lh_with_idx_next : rh[i])
-        }
-      when :nonassoc
-        rh.map!{|r| r == lh ? lh_with_idx_next : r }
-      when :precedence
-      else
-        # type code here
-      end
-      rh_stock.push rh
-    }
-
-    rh_stock.unshift [lh_with_idx_next]
-    tmp_rule.rh = rh_stock
-    rh_stock = []
-    idx_of_devined_rh += 1
-    @grammar.insert idx, tmp_rule
-    idx += 1
+    rh_non_recursion_stock = []
 
     op_rhs.each{|rhs|
+      rh_non_recursion = []
+
       if rh_stock.empty?
-        tmp_rule = Rule.new(lh_with_idx = lh + idx_of_devined_rh.to_s)
+        lh_with_idx = idx_of_devined_rh == 1 ? lh : lh + idx_of_devined_rh.to_s
+        tmp_rule = Rule.new(lh_with_idx)
         lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
       end
 
@@ -146,6 +122,11 @@ module RhSeparater
           puts "It is wrong type."
         end
 
+        unless rh[0] == lh_with_idx  || rh[0] == lh_with_idx_next
+          rh_non_recursion.push rh
+          next
+        end
+=begin
         # 左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
         # この場合 a A.Bの shift と B a A. の reduce で conflict が起こる
         # 本来は shift 優先だがディレクティブによって reduce 優先になる
@@ -169,9 +150,16 @@ module RhSeparater
           }
           rh.insert rh_idx, NegativeLookAHead.new(rh_negative) unless rh_negative.empty?
         end
+=end
         rh_stock.push rh
       }
-      unless rh_stock.empty?
+      if rh_stock.empty?
+        if idx_of_devined_rh == 1
+          rh_non_recursion.each{|rh| rh.map!{|r| r == lh_with_idx_next ? lh : r }}
+        else
+          rh_non_recursion.each{|rh| rh.map!{|r| r == lh_with_idx_next ? lh_with_idx : r }}
+        end
+      else
         rh_stock.unshift [lh_with_idx_next]
         tmp_rule.rh = rh_stock
         rh_stock = []
@@ -179,8 +167,12 @@ module RhSeparater
         @grammar.insert idx, tmp_rule
         idx += 1
       end
-    }
 
+      rh_non_recursion_stock = rh_non_recursion + rh_non_recursion_stock
+    }
+    no_op_rhs += rh_non_recursion_stock
+
+=begin
     # no_op_rhs で左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
     no_op_rhs.each{|no_op_rh|
       if (rh_idx = no_op_rh.index{|r| r == lh }) && rh_idx != 0 && rh_idx != no_op_rh.size-1
@@ -194,6 +186,7 @@ module RhSeparater
         no_op_rh.insert rh_idx, NegativeLookAHead.new(rh_negative) unless rh_negative.empty?
       end
     }
+=end
 
     if (rh_stock + no_op_rhs).empty?
       case idx_of_devined_rh
@@ -249,12 +242,12 @@ module RhOrderSolver
               if rh.size > idx && rh2.size > idx
                 first_rh = rh[idx] =~ /\A[a-z]\w*\Z/ ? calc_first(rh[idx], idx, []).map{|s| [[rule.lh, -1]]+s } : [[[rule.lh, -1], [rh[idx], idx]]]
                 first_rh2 = rh2[idx] =~ /\A[a-z]\w*\Z/ ? calc_first(rh2[idx], idx, []).map{|s| [[rule.lh, -1]]+s } : [[[rule.lh, -1], [rh2[idx], idx]]]
-                first_rh.delete_if{|first| first[1...first.size].find{|f| f[0] == first[0][0] }}
-                first_rh2.delete_if{|first| first[1...first.size].find{|f| f[0] == first[0][0] }}
+                first_rh.delete_if{|first| first[1...first.size].any?{|f| f[0] == first[0][0] }}
+                first_rh2.delete_if{|first| first[1...first.size].any?{|f| f[0] == first[0][0] }}
                 rh_pos = rh2_pos = idx
 
-                unless (matched_syms = first_rh.find_all{|first| first_rh2.find {|first2| first[-1][0] == first2[-1][0] }}).empty?
-                  matched_syms2 = first_rh2.find_all{|first2| matched_syms.find{|syms| syms[-1][0] == first2[-1][0] }}
+                unless (matched_syms = first_rh.find_all{|first| first_rh2.any? {|first2| first[-1][0] == first2[-1][0] }}).empty?
+                  matched_syms2 = first_rh2.find_all{|first2| matched_syms.any?{|syms| syms[-1][0] == first2[-1][0] }}
                   sorted_rh_order[rh][rh2] = true
 
                   # 同じ記号が導出される過程を比較し、導出される過程の suffix の重複を除去する
@@ -415,7 +408,7 @@ module RhOrderSolver
     end
 
    # return @first_set[lh] = [[[lh, 0]]] if lh =~ /[A-Z]\w*/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil?
-    return [] if stack.find{|st| st == lh }
+    return [] if stack.any?{|st| st == lh }
     return @first_set[lh] unless @first_set[lh].empty?
 
     tmp.rh.each{|r|
@@ -452,12 +445,12 @@ module RhOrderSolver
       break_flag = true
       rule = @grammar.find { |rl| rl.lh == first_el.last[0] }
 
-      unless (rhs = rule.rh.find_all { |rh| (rh[el[1]] == el[0] || idx && @token_pairs[idx].find{|token| token == rh[el[1]]})}).empty?
+      unless (rhs = rule.rh.find_all { |rh| (rh[el[1]] == el[0] || idx && @token_pairs[idx].any?{|token| token == rh[el[1]]})}).empty?
         rhs.each { |rh|
           if rh.size > el[1] + 1
             calc_first(rh[el[1] + 1], el[1] + 1, []).each { |first|
               # 既に受理可能な記号列に現れている記号が同じ過程で導出されるのを抑止
-              ret += [first_el + first] unless syms.find{|sym| [first_el + first].join.start_with?(sym.join)} || first_el.find{|el| first.find{|item| el[0] == item[0]}}
+              ret += [first_el + first] unless syms.any?{|sym| [first_el + first].join.start_with?(sym.join)} || first_el.any?{|el| first.any?{|item| el[0] == item[0]}}
             }
           else
             break_flag = false
@@ -480,7 +473,7 @@ module RhOrderSolver
 
     rhs.each{|rh|
       # 間接再帰 || 直接再帰
-      next if stack.find{|st| rh.find{|r| r == st }} || rh.find{|r| r == lh}
+      next if stack.any?{|st| rh.any?{|r| r == st }} || rh.any?{|r| r == lh}
       rh_syms = []
 
       rh.each{|r|
@@ -524,7 +517,7 @@ module LeftRecursionsRemover
 
   def remove_direct_left_recursions
     @grammar.each{|rule|
-      if rule.rh.find{|rh| rh[0] == rule.lh}
+      if rule.rh.any?{|rh| rh[0] == rule.lh}
         # 直接左再帰
         remove_direct_left_recursion rule, rule.lh
       end
@@ -685,7 +678,7 @@ module EmptyRulesRemover
               skip_flag = false
               next
             end
-            next unless rh.find{|r| r == rule.lh}
+            next unless rh.any?{|r| r == rule.lh}
 
             matched_idx = 0
             rh.each_with_index{|r, r_idx|
@@ -741,7 +734,7 @@ module EmptyRulesRemover
 
     rule.rh.find_all{|rh| rh.size == 1 && rh[0] =~ /\A[a-z]\w*\Z/}.each{|rh|
 
-      if stack.find{|st| st == rh[0]}
+      if stack.any?{|st| st == rh[0]}
         return true
       else
         return true if check_infinite_loop stack+rh
