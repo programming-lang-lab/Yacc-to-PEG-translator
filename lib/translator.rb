@@ -49,24 +49,29 @@ module RhSeparater
 
       rule.rh.each{|rh|
         prio = 0
+        unop = 0
 
         if (prec_idx = rh.index{|sym| sym == "%prec" })
           puts "rh doesn't have operand." unless (prio = @precedence.index{|prec| prec.any?{|item| item.value == rh[prec_idx+1]}})
           rh.slice!(prec_idx, 2)
+          # 単項演算の場合に優先度を上げる
+          unop = 0.5 if rh[0] != rule.lh && rh[-1] == rule.lh && @precedence[prio][0].type != :nonassoc
 
-          if (tmp = not_shaped_rhs.find { |item| item.prio == prio })
+          if (tmp = not_shaped_rhs.find { |item| item.prio == prio+unop })
             tmp.rh = tmp.rh + [rh]
           else
-            not_shaped_rhs.push not_shaped_rh.new(prio, [rh], @precedence[prio][0].type)
+            not_shaped_rhs.push not_shaped_rh.new(prio+unop, [rh], @precedence[prio][0].type)
           end
 
         # 演算子を含む場合
         # Yacc では文法規則の末尾の字句の優先度がその文法規則の優先度になる
         elsif rh.reverse.any?{|sym| prio = @precedence.index{|prec| prec.any?{|item| item.value == sym}}}
-          if (tmp = not_shaped_rhs.find { |item| item.prio == prio })
+          unop = 0.5 if rh[0] != rule.lh && rh[-1] == rule.lh && @precedence[prio][0].type != :nonassoc
+
+          if (tmp = not_shaped_rhs.find { |item| item.prio == prio+unop })
             tmp.rh = tmp.rh + [rh] 
           else
-            not_shaped_rhs.push not_shaped_rh.new(prio, [rh], @precedence[prio][0].type) 
+            not_shaped_rhs.push not_shaped_rh.new(prio+unop, [rh], @precedence[prio][0].type)
           end
           
         # 演算子を含まない場合
@@ -89,6 +94,8 @@ module RhSeparater
   # no_op_rhsの要素が複数ある場合に未対応
   # 演算子はあるが再帰にならない文法規則の右辺の場合、次の優先度の演算子を持つ右辺と統合(未実装)
   def shape_rh lh, op_rhs, no_op_rhs, idx
+    no_opr = Struct.new(:idx, :sym)
+
     # 演算子の位置に関係なく演算子の優先度の高い方の結合度を高くする．
     op_rhs.sort!{|a, b| a.prio <=> b.prio }
     idx_of_devined_rh = 1
@@ -97,10 +104,14 @@ module RhSeparater
     tmp_rule = Rule.new lh
     lh_with_idx = lh + idx_of_devined_rh.to_s
     lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
-    rh_non_recursion_stock = []
+    no_recursion_stock = []
+    no_left_oprs_stock = []
+    no_right_oprs_stock = []
 
     op_rhs.each{|rhs|
-      rh_non_recursion = []
+      no_recursion = []
+      no_left_oprs = []
+      no_right_oprs = []
 
       if rh_stock.empty?
         lh_with_idx = idx_of_devined_rh == 1 ? lh : lh + idx_of_devined_rh.to_s
@@ -109,56 +120,79 @@ module RhSeparater
       end
 
       rhs.rh.each{|rh|
-        case rhs.type
-        when :left, :precedence
-          rh[0] = lh_with_idx if rh[0] == lh
-          rh[-1] = lh_with_idx_next if rh[-1] == lh
-        when :right
-          rh[0] = lh_with_idx_next if rh[0] == lh
-          rh[-1] = lh_with_idx if rh[-1] == lh
-        when :nonassoc
-          rh.map!{|r| r == lh ? lh_with_idx_next : r }
+        # 右被演算子を持つ単項演算の場合
+        if rhs.prio % 1 == 0.5
+          rh[-1] = lh_with_idx
         else
-          puts "It is wrong type."
+          case rhs.type
+          when :left, :precedence
+            rh[0] = lh_with_idx if rh[0] == lh
+            rh[-1] = lh_with_idx_next if rh[-1] == lh
+          when :right
+            rh[0] = lh_with_idx_next if rh[0] == lh
+            rh[-1] = lh_with_idx if rh[-1] == lh
+          when :nonassoc
+            rh.map!{|r| r == lh ? lh_with_idx_next : r }
+          else
+            puts "It is wrong type."
+          end
         end
 
-        unless rh[0] == lh_with_idx  || rh[0] == lh_with_idx_next
-          rh_non_recursion.push rh
+        unless rh[0] == lh_with_idx || rh[0] == lh_with_idx_next || rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next
+          no_recursion.push rh
           next
         end
-=begin
-        # 左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
-        # この場合 a A.Bの shift と B a A. の reduce で conflict が起こる
-        # 本来は shift 優先だがディレクティブによって reduce 優先になる
-        # a: a A B %prec THIRD
-        #  | a B   %prec SECOND
-        #  | B a A %prec FIRST
-        #  | C
-        #
-        # a <- a2 (A B)*
-        # a2 <- a3 (a2 B)*
-        # a3 <- a4
-        #     / B !(a2 A B) a A
-        # a4 <- C
-        if (rh_idx = rh.index{|r| r == lh }) && rh_idx != 0 && rh_idx != rh.size-1
-          rh_negative = []
-          op_rhs.each_with_index{|rhs2, rhs2_idx|
-            if rhs2.prio < rhs.prio && rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }
-              tmp_rh = op_rhs[rhs2_idx].rh.find_all{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }.map{|item| item[1...item.size]}
-              rh_negative.push [lh + (rhs2_idx+2).to_s] + [tmp_rh]
-            end
+        no_left_oprs.push Marshal.load(Marshal.dump(rh)) unless rh[0] == lh_with_idx  || rh[0] == lh_with_idx_next
+        no_right_oprs.push Marshal.load(Marshal.dump(rh)) unless rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next
+
+        rh[0] = [[rh[0]]] + no_right_oprs_stock if !no_right_oprs_stock.empty? && (rh[0] == lh_with_idx  || rh[0] == lh_with_idx_next)
+        rh[-1] = [[rh[-1]]] + no_left_oprs_stock if !no_left_oprs_stock.empty? && (rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next)
+
+        tmp_rh = []
+        if rh[0].is_a?(Array)
+          rh[0].each{|r|
+            tmp_rh.push r + rh[1...rh.size]
           }
-          rh.insert rh_idx, NegativeLookAHead.new(rh_negative) unless rh_negative.empty?
+        else
+          tmp_rh.push rh
+        end
+
+        tmp_rh.each{|rh2|
+          if rh2[-1].is_a?(Array)
+            rh2[-1].each{|r|
+              rh_stock.push rh2[0...rh2.size-1] + r
+            }
+          else
+            rh_stock.push rh2
+          end
+        }
+=begin
+        no_left_oprs.push Marshal.load(Marshal.dump(rh)) unless rh[0] == lh_with_idx  || rh[0] == lh_with_idx_next
+        no_right_oprs.push no_opr.new(idx, Marshal.load(Marshal.dump(rh))) unless rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next
+
+        if !no_right_oprs_stock.empty? && (rh[0] == lh_with_idx  || rh[0] == lh_with_idx_next)
+          no_right_oprs_stock.each{|opr| @grammar[opr.idx].rh.insert 1, opr.sym + rh[1...rh.size] }
+        end
+        rh[-1] = [[rh[-1]]] + no_left_oprs_stock if !no_left_oprs_stock.empty? && (rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next)
+
+        if rh[-1].is_a?(Array)
+          rh[-1].each{|r|
+            rh_stock.push rh[0...rh.size-1] + r
+          }
+        else
+          rh_stock.push rh
         end
 =end
-        rh_stock.push rh
       }
+
       if rh_stock.empty?
+=begin
         if idx_of_devined_rh == 1
-          rh_non_recursion.each{|rh| rh.map!{|r| r == lh_with_idx_next ? lh : r }}
+          no_left_oprs.each{|rh| rh.map!{|r| r == lh_with_idx_next ? lh : r }}
         else
-          rh_non_recursion.each{|rh| rh.map!{|r| r == lh_with_idx_next ? lh_with_idx : r }}
+          no_left_oprs.each{|rh| rh.map!{|r| r == lh_with_idx_next ? lh_with_idx : r }}
         end
+=end
       else
         rh_stock.unshift [lh_with_idx_next]
         tmp_rule.rh = rh_stock
@@ -167,26 +201,11 @@ module RhSeparater
         @grammar.insert idx, tmp_rule
         idx += 1
       end
-
-      rh_non_recursion_stock = rh_non_recursion + rh_non_recursion_stock
+      no_recursion_stock = no_recursion + no_recursion_stock
+      no_left_oprs_stock = no_left_oprs + no_left_oprs_stock
+      no_right_oprs_stock = no_right_oprs + no_right_oprs_stock
     }
-    no_op_rhs += rh_non_recursion_stock
-
-=begin
-    # no_op_rhs で左辺の記号を含む右辺で左辺の記号とその後ろが他の右辺の prefix になっている場合
-    no_op_rhs.each{|no_op_rh|
-      if (rh_idx = no_op_rh.index{|r| r == lh }) && rh_idx != 0 && rh_idx != no_op_rh.size-1
-        rh_negative = []
-        op_rhs.each_with_index{|rhs2, rhs2_idx|
-          if rhs2.rh.find{|rh2| rh2[0...rh.size-rh_idx] != rh[rh_idx...rh.size] && rh2.join.start_with?(rh[rh_idx...rh.size].join) }
-            tmp_rh = op_rhs[rhs2_idx].rh.find_all{|rh2| rh2.join.start_with?(rh[rh_idx...rh.size].join) }.map{|item| item[1...item.size]}
-            rh_negative.push [lh + (rhs2_idx+2).to_s] + [tmp_rh]
-          end
-        }
-        no_op_rh.insert rh_idx, NegativeLookAHead.new(rh_negative) unless rh_negative.empty?
-      end
-    }
-=end
+    no_op_rhs += no_recursion_stock
 
     if (rh_stock + no_op_rhs).empty?
       case idx_of_devined_rh
@@ -264,7 +283,7 @@ module RhOrderSolver
 
                   matched_syms.map!{|syms| [[syms[-1][0]], syms]}
                   matched_syms2.map!{|syms| [[syms[-1][0]], syms]}
-#=begin
+=begin
                   puts "Order of right hand side may be wrong.\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
                   print "Both rules lead \"#{matched_syms[0][0][0]}\""
 
@@ -288,7 +307,7 @@ module RhOrderSolver
                     puts ""
                   }
                   puts "\n"
-#=end
+=end
                   # 全ての受理可能な入力の導出
 =begin
                   loop do
@@ -511,8 +530,20 @@ module LeftRecursionsRemover
   def check_indirect_left_recursions
     @grammar.each{|rule|
       #redo unless check_indirect_left_recursion rule, [rule.lh]
-      check_indirect_left_recursion rule, [rule.lh]
+      case check_indirect_left_recursion rule, [rule.lh]
+      when 0
+        return false
+      when false
+        redo
+      when true
+        # do nothing
+      else
+        puts "The value is invalid."
+        exit 1
+      end
+      #check_indirect_left_recursion rule, [rule.lh]
     }
+    true
   end
 
   def remove_direct_left_recursions
@@ -534,9 +565,32 @@ module LeftRecursionsRemover
       when nil
         if rh[0] =~ /\A[a-z]\w*\Z/
           next unless (tmp = @grammar.find{|rl| rl.lh == rh[0]})
+          case check_indirect_left_recursion tmp, stack+[rh[0]]
+          when 0
+            return 0
+          when false
+            return false
+          when true
+            # do nothing
+          else
+            puts "The value is invalid."
+            exit 1
+          end
           return false unless check_indirect_left_recursion(tmp, stack+[rh[0]])
         end
       else
+        dir_rec = nil
+        if @grammar.any?{|rl| stack[idx+1...stack.size].any?{|st| st == rl.lh && dir_rec = rl.rh.find{|r| r[0] == rl.lh } }}
+          puts "The translator can't remove an indirect left recursion:"
+          print "  #{stack[idx]}"
+          (idx+1...stack.size).each{|i|
+            print " -> #{stack[i]}"
+          }
+          print " -> #{rh[0]}\n"
+          puts "due to a direct recursion:\n  #{dir_rec[0]}"
+          return 0
+        end
+
         # 間接左再帰
         remove_indirect_left_recursion rule, stack[idx...stack.size]
         # ここでbreakすることで文法規則が変換された後に変換前のスタックに基づいて左再帰の検出が行われることを防ぐ
@@ -789,11 +843,12 @@ class Translator
   def translate
     divide_rh
     remove_empty_rules
-    check_indirect_left_recursions
-    remove_unused_rules
-    solve_rh_order
-    insert_skip_symbol
-    remove_direct_left_recursions
+    if check_indirect_left_recursions
+      remove_unused_rules
+      solve_rh_order
+      insert_skip_symbol
+      remove_direct_left_recursions
+    end
     self
   end
 end
