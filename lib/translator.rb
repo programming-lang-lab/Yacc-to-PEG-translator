@@ -741,11 +741,11 @@ module EmptyRulesRemover
             end
             @grammar.each{|rule2|
               # 空規則を含む右辺にマッチしたとき、右辺を増やすため1つの右辺の処理を飛ばす必要がある
-              skip_flag = false
+              skip_cnt = 0
 
               rule2.rh.each_with_index {|rh, rh_idx|
-                if skip_flag
-                  skip_flag = false
+                unless skip_cnt == 0
+                  skip_cnt -= 1
                   next
                 end
                 next unless rh.any?{|r| r == rule.lh}
@@ -786,7 +786,7 @@ module EmptyRulesRemover
                     else
                       rule2.rh.insert(rh_idx+matched_idx+1, tmp_rh)
                     end
-                    skip_flag = true
+                    skip_cnt += 1
                   end
                   matched_idx += 1
                 }
