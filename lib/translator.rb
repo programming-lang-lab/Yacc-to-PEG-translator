@@ -1,4 +1,5 @@
 # coding: utf-8
+require 'timeout'
 module SkipSymbolInserter
   def insert_skip_symbol
     return unless @grammar.any? { |rule| rule.lh == @skip_lh }
@@ -6,16 +7,16 @@ module SkipSymbolInserter
     @grammar.each{|rule|
       case rule.lh
       when /\A(?![^\s]*#{@skip_lh})[A-Z]\w*/
-      rule.rh.each{|rh|
-        unless rh[0] !~ /\A(?!"WORD")"\w+"\Z/
-          rh.push "!WORD"
-          unless @words_flag
-            @words_flag = true
-            tmp_rule = Rule.new "WORD"
-            tmp_rule.rh = [["[a-zA-Z_0-9]"]]
-            @grammar.push tmp_rule
+        rule.rh.each{|rh|
+          unless rh[0] !~ /\A(?!"WORD")"\w+"\Z/
+            rh.push "!WORD"
+            unless @words_flag
+              @words_flag = true
+              tmp_rule = Rule.new "WORD"
+              tmp_rule.rh = [["[a-zA-Z_0-9]"]]
+              @grammar.push tmp_rule
+            end
           end
-        end
           rh.push @skip_lh
         }
       when /\A(?!#{@skip_lh})[a-z_]\w*/
@@ -63,19 +64,19 @@ module RhSeparater
             not_shaped_rhs.push not_shaped_rh.new(prio+unop, [rh], @precedence[prio][0].type)
           end
 
-        # 演算子を含む場合
-        # Yacc では文法規則の末尾の字句の優先度がその文法規則の優先度になる
+          # 演算子を含む場合
+          # Yacc では文法規則の末尾の字句の優先度がその文法規則の優先度になる
         elsif rh.reverse.any?{|sym| prio = @precedence.index{|prec| prec.any?{|item| item.value == sym}}}
           unop = 0.5 if rh[0] != rule.lh && rh[-1] == rule.lh && @precedence[prio][0].type != :nonassoc
 
           if (tmp = not_shaped_rhs.find { |item| item.prio == prio+unop })
-            tmp.rh = tmp.rh + [rh] 
+            tmp.rh = tmp.rh + [rh]
           else
             not_shaped_rhs.push not_shaped_rh.new(prio+unop, [rh], @precedence[prio][0].type)
           end
-          
-        # 演算子を含まない場合
-        # [0][0]をキーとして文法規則を格納する
+
+          # 演算子を含まない場合
+          # [0][0]をキーとして文法規則を格納する
         else
           no_op_rhs.push rh
         end
@@ -246,7 +247,7 @@ module RhOrderSolver
               rule.rh[i], rule.rh[j] = rule.rh[j], rule.rh[i]
 
               # shift / reduce conflictが起きるが正しくソートされている場合
-#            elsif rh.size <= rh2.size && rh2.join.start_with?(rh.join)
+              #            elsif rh.size <= rh2.size && rh2.join.start_with?(rh.join)
             else
 
               # 直接再帰の検出
@@ -409,9 +410,9 @@ module RhOrderSolver
               end
             end
             break if break_flag
-            }
-          break if break_flag
           }
+          break if break_flag
+        }
         break unless break_flag
       end
     }
@@ -419,32 +420,32 @@ module RhOrderSolver
 
   # 再帰にならない規則がない場合は[]を返す
   def calc_first lh, idx, stack
- #   if (pair = @token_pairs.find{|item| item.find{|it| it == lh}})
- #     return @first_set[lh] = [[[pair.join, idx]]]
- #elsif lh !~ /\A[a-z]\w*\Z/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil?
+    #   if (pair = @token_pairs.find{|item| item.find{|it| it == lh}})
+    #     return @first_set[lh] = [[[pair.join, idx]]]
+    #elsif lh !~ /\A[a-z]\w*\Z/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil?
     if lh !~ /\A[a-z]\w*\Z/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil?
       return @first_set[lh] = [[[lh, idx]]]
     end
 
-   # return @first_set[lh] = [[[lh, 0]]] if lh =~ /[A-Z]\w*/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil?
+    # return @first_set[lh] = [[[lh, 0]]] if lh =~ /[A-Z]\w*/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil?
     return [] if stack.any?{|st| st == lh }
     return @first_set[lh] unless @first_set[lh].empty?
 
     tmp.rh.each{|r|
       tmp_idx = (r[0].is_a?(Repeat) || r[0].is_a?(NegativeLookAHead)) && r.size > 1 && !(r[1].is_a?(Repeat) || r[1].is_a?(NegativeLookAHead)) ? 1 : 0
-     case r[tmp_idx]
-     when /[a-z]\w*/
-       calc_first(r[tmp_idx], tmp_idx, stack + [lh]).each{|el|
-         @first_set[lh] += [[[lh, idx]] + el]
-       }
-     when nil
-     else
+      case r[tmp_idx]
+      when /[a-z]\w*/
+        calc_first(r[tmp_idx], tmp_idx, stack + [lh]).each{|el|
+          @first_set[lh] += [[[lh, idx]] + el]
+        }
+      when nil
+      else
 #       if (pair = @token_pairs.find{|item| item.find{|it| it == r[tmp_idx]}})
 #         @first_set[lh] +=  [[[lh, idx], [pair.join, tmp_idx]]]
 #       else
-         @first_set[lh] +=  [[[lh, idx], [r[tmp_idx], tmp_idx]]]
+        @first_set[lh] +=  [[[lh, idx], [r[tmp_idx], tmp_idx]]]
 #       end
-     end
+      end
     }
     unless stack.empty? && idx == 0
       ret = @first_set[lh]
@@ -528,13 +529,23 @@ end
 
 module LeftRecursionsRemover
   def check_indirect_left_recursions
+    cnt = Hash.new
     @grammar.each{|rule|
       #redo unless check_indirect_left_recursion rule, [rule.lh]
       case check_indirect_left_recursion rule, [rule.lh]
       when 0
         return false
       when false
-        redo
+        case cnt[rule.lh]
+        when nil
+          cnt[rule.lh] = 1
+        when 5
+          puts "The translator can't remove an indirect left recursion:\n  #{rule.lh}"
+          return false
+        else
+          cnt[rule.lh] += 1
+          redo
+        end
       when true
         # do nothing
       else
@@ -580,14 +591,14 @@ module LeftRecursionsRemover
         end
       else
         dir_rec = nil
-        if @grammar.any?{|rl| stack[idx+1...stack.size].any?{|st| st == rl.lh && dir_rec = rl.rh.find{|r| r[0] == rl.lh } }}
+        if @grammar.any?{|rl| stack[idx+1...stack.size].any?{|st| st == rl.lh && (dir_rec = rl.rh.find{|r| r[0] == rl.lh }) }}
           puts "The translator can't remove an indirect left recursion:"
           print "  #{stack[idx]}"
           (idx+1...stack.size).each{|i|
             print " -> #{stack[i]}"
           }
           print " -> #{rh[0]}\n"
-          puts "due to a direct recursion:\n  #{dir_rec[0]}"
+          puts "due to a left recursion:\n  #{dir_rec[0]}"
           return 0
         end
 
@@ -599,7 +610,7 @@ module LeftRecursionsRemover
     }
     true
   end
-  
+
   # 文法規則の除去は全ての演算が終わった後に行う
   # ruleをsymに関して直接左再帰の除去を行う
   # 空規則に非対応
@@ -608,10 +619,10 @@ module LeftRecursionsRemover
     matched_rule = rule.rh.find_all{|rh| rh[0] == sym }
     # 再帰を含まない文法規則
     unmatched_rule = rule.rh.reject{|rh| rh[0] == sym }
-    
+
     tmp_rule = []
     matched_rule.each{|rl| tmp_rule.push rl[1...rl.size]}
-      
+
     # 左再帰になる文法規則の記号列が1つのみで元の文法規則がおかしい場合
     # a <- A B
     #    / C
@@ -621,7 +632,7 @@ module LeftRecursionsRemover
     else
       # 新しい文法規則の生成
       case unmatched_rule.size
-      # 再帰にならない右辺が空規則しかなく、空規則の除去器で空規則が除去されている場合
+        # 再帰にならない右辺が空規則しかなく、空規則の除去器で空規則が除去されている場合
       when 0
         rule.rh = [[OneOrMore.new(tmp_rule)]]
       when 1
@@ -683,20 +694,20 @@ module LeftRecursionsRemover
   # input:
   # a <- (A B / C) D
   #    / E
-  
+
   # output
   # a <- A B D
   #    / C D
   #    / E
   def flatten_rule rule
     return rule unless rule.rh[0][0].is_a?(Array)
-    
+
     tmp_rh = []
-    
+
     rule.rh[0][0].each{|item|
       tmp_rh.push item + rule.rh[0][1...rule.rh[0].size]
     }
-    
+
     if rule.rh.size == 1
       rule.rh = tmp_rh
     else
@@ -711,74 +722,84 @@ module EmptyRulesRemover
   # 空規則を除去
   # 空規則に%precが使われている場合があるため、separate_rhの後に使用
   def remove_empty_rules
-    loop do
-      loop_flag = false
+    cnt = 0
+    begin
+      Timeout.timeout(10){
+        loop do
+          break if cnt > 2
+          cnt += 1
+          loop_flag = false
 
-      @grammar[1...@grammar.size].each{|rule|
-        next unless (idx = rule.rh.index{|rh| rh[0] == "" })
-        loop_flag = true
-        # ruleに空規則しかない場合
-        if (rh_size = rule.rh.size) == 1
-          @grammar.delete_if{|rl| rl.lh == rule.lh}
-        else
-          rule.rh.delete_at(idx)
-        end
-        @grammar.each{|rule2|
-          # 空規則を含む右辺にマッチしたとき、右辺を増やすため1つの右辺の処理を飛ばす必要がある
-          skip_flag = false
-
-          rule2.rh.each_with_index {|rh, rh_idx|
-            if skip_flag
-              skip_flag = false
-              next
+          @grammar[1...@grammar.size].each{|rule|
+            next unless (idx = rule.rh.index{|rh| rh[0] == "" })
+            loop_flag = true
+            # ruleに空規則しかない場合
+            if (rh_size = rule.rh.size) == 1
+              @grammar.delete_if{|rl| rl.lh == rule.lh}
+            else
+              rule.rh.delete_at(idx)
             end
-            next unless rh.any?{|r| r == rule.lh}
+            @grammar.each{|rule2|
+              # 空規則を含む右辺にマッチしたとき、右辺を増やすため1つの右辺の処理を飛ばす必要がある
+              skip_flag = false
 
-            matched_idx = 0
-            rh.each_with_index{|r, r_idx|
-              if r == rule.lh
-                tmp_rh = rh[0...r_idx] + rh[r_idx+1...rh.size]
-              else
-                next
-              end
-
-              # 空規則を除去して他の文法規則で空規則が発生する場合
-              if tmp_rh.empty?
-                tmp_rh = [""]
-                # 空規則の除去して右辺に左辺と一致しているものが発生する場合に削除
-                # stmts <- stmt
-                #        / stmts stmt
-                #        / stmts
-              elsif tmp_rh.size == 1
-                # 無限ループを検出した場合に文法規則の右辺に挿入しない
-                if tmp_rh[0] == rule2.lh
+              rule2.rh.each_with_index {|rh, rh_idx|
+                if skip_flag
+                  skip_flag = false
                   next
-                else
-                  next if check_infinite_loop [rule2.lh]+tmp_rh
                 end
+                next unless rh.any?{|r| r == rule.lh}
 
-                # 空規則の直前に否定先読みがある場合
-              else
-                tmp_rh.pop if tmp_rh.last.is_a?(NegativeLookAHead)
-              end
-              # ruleに空規則しかない場合に他の文法規則に現れるその規則を全て削除
-              if rh_size == 1
-                rule2.rh[rh_idx] = tmp_rh
-              else
-                if idx == 0
-                  rule2.rh.insert(rh_idx+matched_idx, tmp_rh)
-                else
-                  rule2.rh.insert(rh_idx+matched_idx+1, tmp_rh)
-                end
-                skip_flag = true
-              end
-              matched_idx += 1
+                matched_idx = 0
+                rh.each_with_index{|r, r_idx|
+                  if r == rule.lh
+                    tmp_rh = rh[0...r_idx] + rh[r_idx+1...rh.size]
+                  else
+                    next
+                  end
+
+                  # 空規則を除去して他の文法規則で空規則が発生する場合
+                  if tmp_rh.empty?
+                    tmp_rh = [""]
+                    # 空規則の除去して右辺に左辺と一致しているものが発生する場合に削除
+                    # stmts <- stmt
+                    #        / stmts stmt
+                    #        / stmts
+                  elsif tmp_rh.size == 1
+                    # 無限ループを検出した場合に文法規則の右辺に挿入しない
+                    if tmp_rh[0] == rule2.lh
+                      next
+                    else
+                      next if check_infinite_loop [rule2.lh]+tmp_rh
+                    end
+
+                    # 空規則の直前に否定先読みがある場合
+                  else
+                    tmp_rh.pop if tmp_rh.last.is_a?(NegativeLookAHead)
+                  end
+                  # ruleに空規則しかない場合に他の文法規則に現れるその規則を全て削除
+                  if rh_size == 1
+                    rule2.rh[rh_idx] = tmp_rh
+                  else
+                    if idx == 0
+                      rule2.rh.insert(rh_idx+matched_idx, tmp_rh)
+                    else
+                      rule2.rh.insert(rh_idx+matched_idx+1, tmp_rh)
+                    end
+                    skip_flag = true
+                  end
+                  matched_idx += 1
+                }
+              }
+              rule2.rh = rule2.rh.uniq
             }
           }
-          rule2.rh = rule2.rh.uniq
-        }
+          break unless loop_flag
+        end
       }
-      break unless loop_flag
+    rescue Timeout::Error
+      puts "The translator can't remove all empty rules in Yacc description."
+      return false
     end
   end
 
@@ -837,18 +858,17 @@ class Translator
     @grammar += other.grammar
     self
   end
-  
+
   # 非終端記号の配列のインデックスを持つハッシュの生成
   # 終端記号の配列のインデックスを持つハッシュの生成
   def translate
     divide_rh
-    remove_empty_rules
-    if check_indirect_left_recursions
-      remove_unused_rules
-      solve_rh_order
-      insert_skip_symbol
-      remove_direct_left_recursions
-    end
+    return self unless remove_empty_rules
+    return self unless check_indirect_left_recursions
+    remove_unused_rules
+    solve_rh_order
+    insert_skip_symbol
+    remove_direct_left_recursions
     self
   end
 end
