@@ -49,36 +49,32 @@ module RhSeparater
       no_op_rhs = []
 
       rule.rh.each{|rh|
-        prio = 0
+        prio = nil
         unop = 0
 
         if (prec_idx = rh.index{|sym| sym == "%prec" })
           puts "rh doesn't have operand." unless (prio = @precedence.index{|prec| prec.any?{|item| item.value == rh[prec_idx+1]}})
           rh.slice!(prec_idx, 2)
-          # 単項演算の場合に優先度を上げる
-          unop = 0.5 if rh[0] != rule.lh && rh[-1] == rule.lh && @precedence[prio][0].type != :nonassoc
-
-          if (tmp = not_shaped_rhs.find { |item| item.prio == prio+unop })
-            tmp.rh = tmp.rh + [rh]
-          else
-            not_shaped_rhs.push not_shaped_rh.new(prio+unop, [rh], @precedence[prio][0].type)
-          end
-
+        else
           # 演算子を含む場合
           # Yacc では文法規則の末尾の字句の優先度がその文法規則の優先度になる
-        elsif rh.reverse.any?{|sym| prio = @precedence.index{|prec| prec.any?{|item| item.value == sym}}}
-          unop = 0.5 if rh[0] != rule.lh && rh[-1] == rule.lh && @precedence[prio][0].type != :nonassoc
-
-          if (tmp = not_shaped_rhs.find { |item| item.prio == prio+unop })
-            tmp.rh = tmp.rh + [rh]
-          else
-            not_shaped_rhs.push not_shaped_rh.new(prio+unop, [rh], @precedence[prio][0].type)
-          end
-
-          # 演算子を含まない場合
-          # [0][0]をキーとして文法規則を格納する
-        else
+          rh.reverse.each{|sym|
+            break if (prio = @precedence.index{|prec| prec.any?{|item| item.value == sym}})
+          }
+        end
+        # 優先度を持つ字句を含まない場合
+        # [0][0]をキーとして文法規則を格納する
+        if prio.nil? || rh[0] != rule.lh && rh[-1] != rule.lh
           no_op_rhs.push rh
+          next
+        end
+        # 単項演算の場合に優先度を上げる
+        unop = 0.5 if rh[0] != rule.lh && rh[-1] == rule.lh && @precedence[prio][0].type != :nonassoc
+
+        if (tmp = not_shaped_rhs.find { |item| item.prio == prio + unop })
+          tmp.rh = tmp.rh + [rh]
+        else
+          not_shaped_rhs.push not_shaped_rh.new(prio + unop, [rh], @precedence[prio][0].type)
         end
       }
 
