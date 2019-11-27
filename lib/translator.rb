@@ -801,6 +801,7 @@ module EmptyRulesRemover
       puts "The translator can't remove all empty rules in Yacc description."
       return false
     end
+    true
   end
 
   private
