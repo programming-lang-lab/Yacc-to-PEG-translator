@@ -280,7 +280,7 @@ module RhOrderSolver
 
                   matched_syms.map!{|syms| [[syms[-1][0]], syms]}
                   matched_syms2.map!{|syms| [[syms[-1][0]], syms]}
-=begin
+#=begin
                   puts "Order of right hand side may be wrong.\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
                   print "Both rules lead \"#{matched_syms[0][0][0]}\""
 
@@ -304,7 +304,7 @@ module RhOrderSolver
                     puts ""
                   }
                   puts "\n"
-=end
+#=end
                   # 全ての受理可能な入力の導出
 =begin
                   loop do
@@ -565,7 +565,10 @@ module LeftRecursionsRemover
   private
   # stackは辿った記号の配列
   def check_indirect_left_recursion rule, stack
-    rule.rh.each{|rh|
+    ret = @recursion_memo[rule.lh][stack.join]
+    return ret unless ret.nil?
+
+      rule.rh.each{|rh|
       next if rule.lh == rh[0]
       idx = stack.index{|st| st == rh[0]}
       case idx
@@ -574,16 +577,16 @@ module LeftRecursionsRemover
           next unless (tmp = @grammar.find{|rl| rl.lh == rh[0]})
           case check_indirect_left_recursion tmp, stack+[rh[0]]
           when 0
-            return 0
+            return @recursion_memo[rule.lh][stack.join] = 0
           when false
-            return false
+            return @recursion_memo[rule.lh][stack.join] = false
           when true
             # do nothing
           else
             puts "The value is invalid."
             exit 1
           end
-          return false unless check_indirect_left_recursion(tmp, stack+[rh[0]])
+          return @recursion_memo[rule.lh][stack.join] = false unless check_indirect_left_recursion(tmp, stack+[rh[0]])
         end
       else
         dir_rec = nil
@@ -595,16 +598,16 @@ module LeftRecursionsRemover
           }
           print " -> #{rh[0]}\n"
           puts "due to a left recursion:\n  #{dir_rec[0]}"
-          return 0
+          return @recursion_memo[rule.lh][stack.join] = 0
         end
 
         # 間接左再帰
         remove_indirect_left_recursion rule, stack[idx...stack.size]
         # ここでbreakすることで文法規則が変換された後に変換前のスタックに基づいて左再帰の検出が行われることを防ぐ
-        return false
+        return @recursion_memo[rule.lh][stack.join] = false
       end
     }
-    true
+    @recursion_memo[rule.lh][stack.join] = true
   end
 
   # 文法規則の除去は全ての演算が終わった後に行う
@@ -846,6 +849,7 @@ class Translator
     @first_set = Hash.new{|h, k| h[k] = [] }
     @follow_set = {}
     @syms_set = Hash.new{|h, k| h[k] = {} }
+    @recursion_memo = Hash.new{|h, k| h[k] = {} }
   end
 
   def +(other)
