@@ -143,7 +143,7 @@ module RhSeparater
         no_right_oprs.push Marshal.load(Marshal.dump(rh)) unless rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next
 
         rh[0] = no_right_oprs_stock + [[rh[0]]] if !no_right_oprs_stock.empty? && (rh[0] == lh_with_idx  || rh[0] == lh_with_idx_next)
-        rh[-1] = no_right_oprs_stock + no_left_oprs_stock + [[rh[-1]]] if !no_left_oprs_stock.empty? && (rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next)
+        rh[-1] = no_left_oprs_stock + [[rh[-1]]] if !no_left_oprs_stock.empty? && (rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next)
 
         tmp_rh = []
         if rh[0].is_a?(Array)
