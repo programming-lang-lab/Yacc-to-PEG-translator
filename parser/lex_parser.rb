@@ -138,7 +138,7 @@ class LexParser < Parser
     label.upcase! if label
 
     if ary
-      if !@reserved_word_flag && rh =~ /\A"\w+"|\w+\Z/
+      if !@reserved_word_flag && rh =~ /\A"[a-zA-Z]\w*"|[a-zA-Z]\w*\Z/
         ary.each{|item|
           @reserved_words.push [item]
         }
