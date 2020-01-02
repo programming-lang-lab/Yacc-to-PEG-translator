@@ -2,7 +2,8 @@
 require 'timeout'
 module SkipSymbolInserter
   def insert_skip_symbol
-    return unless @grammar.any? { |rule| rule.lh == @skip_lh }
+    skip_flag = true
+    skip_flag = false unless @grammar.any? { |rule| rule.lh == @skip_lh }
 
     @grammar.each{|rule|
       case rule.lh
@@ -17,9 +18,10 @@ module SkipSymbolInserter
               @grammar.push tmp_rule
             end
           end
-          rh.push @skip_lh
+          rh.push @skip_lh if skip_flag
         }
       when /\A(?!#{@skip_lh})[a-z_]\w*/
+        next unless skip_flag
         rule.rh.each{|rh|
           rh.each_with_index{|r, idx|
             rh.insert(idx+1, @skip_lh) if r =~ /'(\\'|[^'])*'|"(\\"|[^"])*"/
@@ -64,7 +66,7 @@ module RhSeparater
         end
         # 優先度を持つ字句を含まない場合
         # [0][0]をキーとして文法規則を格納する
-        if prio.nil? || rh[0] != rule.lh && rh[-1] != rule.lh
+        if prio.nil?
           no_op_rhs.push rh
           next
         end
@@ -101,12 +103,10 @@ module RhSeparater
     tmp_rule = Rule.new lh
     lh_with_idx = lh + idx_of_devined_rh.to_s
     lh_with_idx_next = lh + (idx_of_devined_rh+1).to_s
-    no_recursion_stock = []
     no_left_oprs_stock = []
     no_right_oprs_stock = []
 
     op_rhs.each{|rhs|
-      no_recursion = []
       no_left_oprs = []
       no_right_oprs = []
 
@@ -135,10 +135,6 @@ module RhSeparater
           end
         end
 
-        unless rh[0] == lh_with_idx || rh[0] == lh_with_idx_next || rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next
-          no_recursion.push rh
-          next
-        end
         no_left_oprs.push Marshal.load(Marshal.dump(rh)) unless rh[0] == lh_with_idx  || rh[0] == lh_with_idx_next
         no_right_oprs.push Marshal.load(Marshal.dump(rh)) unless rh[-1] == lh_with_idx  || rh[-1] == lh_with_idx_next
 
@@ -198,11 +194,9 @@ module RhSeparater
         @grammar.insert idx, tmp_rule
         idx += 1
       end
-      no_recursion_stock = no_recursion + no_recursion_stock
       no_left_oprs_stock = no_left_oprs + no_left_oprs_stock
       no_right_oprs_stock += no_right_oprs
     }
-    no_op_rhs += no_recursion_stock
 
     if (rh_stock + no_op_rhs).empty?
       case idx_of_devined_rh
@@ -245,7 +239,6 @@ module RhOrderSolver
               # shift / reduce conflictが起きるが正しくソートされている場合
               #            elsif rh.size <= rh2.size && rh2.join.start_with?(rh.join)
             else
-
               # 直接再帰の検出
               #next if rh.find{|r| r == rule.lh } || rh2.find{|r| r == rule.lh }
 
@@ -258,8 +251,10 @@ module RhOrderSolver
               if rh.size > idx && rh2.size > idx
                 first_rh = rh[idx] =~ /\A[a-z]\w*\Z/ ? calc_first(rh[idx], idx, []).map{|s| [[rule.lh, -1]]+s } : [[[rule.lh, -1], [rh[idx], idx]]]
                 first_rh2 = rh2[idx] =~ /\A[a-z]\w*\Z/ ? calc_first(rh2[idx], idx, []).map{|s| [[rule.lh, -1]]+s } : [[[rule.lh, -1], [rh2[idx], idx]]]
-                first_rh.delete_if{|first| first[1...first.size].any?{|f| f[0] == first[0][0] }}
-                first_rh2.delete_if{|first| first[1...first.size].any?{|f| f[0] == first[0][0] }}
+                # rh[idx] と rh2[idx] に対して左再帰が起こっている場合に削除
+                # 左再帰を介さないと到達できない FIRST 集合の要素を削除してしまうため保留
+                # first_rh.delete_if{|first| first[1...first.size].any?{|f| f[0] == first[0][0] }}
+                # first_rh2.delete_if{|first| first[1...first.size].any?{|f| f[0] == first[0][0] }}
                 rh_pos = rh2_pos = idx
 
                 unless (matched_syms = first_rh.find_all{|first| first_rh2.any? {|first2| first[-1][0] == first2[-1][0] }}).empty?
@@ -416,6 +411,7 @@ module RhOrderSolver
 
   # 再帰にならない規則がない場合は[]を返す
   def calc_first lh, idx, stack
+
     #   if (pair = @token_pairs.find{|item| item.find{|it| it == lh}})
     #     return @first_set[lh] = [[[pair.join, idx]]]
     #elsif lh !~ /\A[a-z]\w*\Z/ || (tmp = @grammar.find{|rule| rule.lh == lh}).nil?
@@ -466,7 +462,7 @@ module RhOrderSolver
           if rh.size > el[1] + 1
             calc_first(rh[el[1] + 1], el[1] + 1, []).each { |first|
               # 既に受理可能な記号列に現れている記号が同じ過程で導出されるのを抑止
-              ret += [first_el + first] unless syms.any?{|sym| [first_el + first].join.start_with?(sym.join)} || first_el.any?{|el| first.any?{|item| el[0] == item[0]}}
+              ret += [first_el + first] unless syms.any?{|sym| [first_el + first].join.start_with?(sym.join)} || first_el.any?{|el2| first.any?{|item| el2[0] == item[0]}}
             }
           else
             break_flag = false
