@@ -82,7 +82,7 @@ class YaccParser < Parser
   end
   
   def code
-    check_token("(%(code\s*(requires|provides|top|imports)?\s*)?{)(?~%})%}")
+    check_token("%{(?~%})%}|%code\s*(requires|provides|top|imports)?\s*{[^}]*}")
   end
   
   def expect
