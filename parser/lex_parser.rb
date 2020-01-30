@@ -16,10 +16,13 @@ class LexParser < Parser
     # c_comment: Cのコメントを除くメソッド
     # space: 空白文字を除くメソッド
     before_hook_methods = [[[:space, :c_comment],
-                            [:option, :option_x, :option_s, :code, :constant, :token_type, :action]],
+                            [:option, :option_x, :option_s, :code, :constant, :token_type]],
                                                                                  
                            [[:space],
-                            [:regexp, :string]]]
+                            [:regexp, :string]],
+
+                           [[:c_comment],
+                            [:action]]]
     
     self.class.before_hook_parse before_hook_methods
   end
@@ -237,7 +240,7 @@ class LexParser < Parser
         @input.slice!(0..3)
       end
       unless (ret = regexp)
-        puts "paren: parse error."
+        puts "regexp_option: parse error."
         exit 1
       end
       @input.slice!(0)
@@ -332,7 +335,7 @@ class LexParser < Parser
   end
     
   def action
-    if @input =~ /\A(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})|(\\{|\\}|[^{}\n])+/
+    if @input =~ /\A[ \t\r\f\v]*(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})|\A(\\{|\\}|[^{}\n])+/
       @input = $'
       pat = $&
       label = pat =~ /BEGIN\s*\(?\s*(\w+)\s*\)?/ ? $1 : nil
