@@ -54,7 +54,7 @@ class LexParser < Parser
       if rh.last.empty?
         tmp_syms = []
         syms[0].each{|item|
-          tmp_sym = item[0].split(/\//)
+          tmp_sym = item[0].split(/(?!\/)\//)
           tmp_sym.each{|item2| tmp_syms.push [item2]}
         }
 
@@ -87,7 +87,12 @@ class LexParser < Parser
   private
   def constant
     return false unless (tmp = string)
-    @const[tmp] = regexp.gsub("\\", "\\\\\\\\")
+    tmp_regexp = regexp.gsub("\\", "\\\\\\\\")
+    if tmp_regexp.index("/")
+      @const[tmp] = "(" + tmp_regexp + ")"
+    else
+      @const[tmp] = tmp_regexp
+    end
     @const.each{|k, v| @const[tmp].gsub!(/{#{k}}/, v)}
     true
   end
@@ -210,7 +215,7 @@ class LexParser < Parser
 
   def regexp
     ret = ""
-    while (tmp = eof || regexp_option || paren || class_char || constant_char || literal || or_operator || any_char || nonwrapped_string)
+    while (tmp = eof || regexp_option || paren || class_char || constant_char || literal || slash || or_operator || any_char || nonwrapped_string)
       if (rep = repeat_operator)
         ret += tmp + rep + " "
       else
@@ -287,6 +292,11 @@ class LexParser < Parser
     false
   end
 
+  def slash
+    return "\"\\/\"" if check_token "/"
+    false
+  end
+
   def or_operator
     return "/" if check_token "\\|"
     false
@@ -296,6 +306,7 @@ class LexParser < Parser
     case @input
     when /\A{[1-9,\s]*}/
       @input = $'
+      #return $&
       return "*"
     when /\A[*+?]/
       @input = $'
