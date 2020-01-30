@@ -39,7 +39,7 @@ class YaccParser < Parser
   end
 
   def parse
-    while token || type || start || debug || union || code || expect || pure_parser || lex_param || parse_param || initial_action || right || left || precedence || nonassoc do
+    while token || type || start || debug || define || union || code || expect || pure_parser || lex_param || parse_param || name_prefix || error_verbose || dir_require || locations || initial_action || right || left || precedence || nonassoc do
     end
     space
     check_token "%%"
@@ -76,7 +76,13 @@ class YaccParser < Parser
   def debug
     check_token("%debug")
   end
-  
+
+  def define
+    return false unless check_token("%define")
+    @input.sub!(/[^\n]*\n/, '')
+    true
+  end
+
   def union
     return false unless check_token("%union")
     @input.sub!(/(?<paren>{('[^']*'|"[^"]*"|[^{}'"]+|\g<paren>)*})\s*/, '')
@@ -109,13 +115,37 @@ class YaccParser < Parser
     @input.sub!(/[^\n]*\n/, '')
     true
   end
-  
+
+  def name_prefix
+    return false unless check_token("%name-prefix")
+    @input.sub!(/[^\n]*\n/, '')
+    true
+  end
+
+  def error_verbose
+    return false unless check_token("%error-verbose")
+    @input.sub!(/[^\n]*\n/, '')
+    true
+  end
+
+  def dir_require
+    return false unless check_token("%require")
+    @input.sub!(/[^\n]*\n/, '')
+    true
+  end
+
+  def locations
+    return false unless check_token("%locations")
+    @input.sub!(/[^\n]*\n/, '')
+    true
+  end
+
   def initial_action
     return false unless check_token("%initial-action")
     @input.sub!(/(?<paren>{('[^']*'|"[^"]*"|[^{}'"]+|\g<paren>)*})\s*;\s*/, '')
     true
   end
-  
+
   def left
     return false unless check_token("%left")
     prec = []
