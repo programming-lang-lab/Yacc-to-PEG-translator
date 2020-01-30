@@ -25,13 +25,15 @@ class YaccParser < Parser
                              :empty,
                              :prec,
                              :action,
-                             :string]],
+                             :string,
+                             :grammar]],
                            
                            [[:space],
                             [:initial_action]],
 
-                           [[:c_comment],
-                            [:grammars]]]
+                           #                           [[:c_comment],
+                           #[:grammars]]
+                           ]
     
     self.class.before_hook_parse before_hook_methods
   end
@@ -43,7 +45,6 @@ class YaccParser < Parser
     check_token "%%"
 
     grammars
-    space
     check_token "%%"
     super
   end
@@ -196,6 +197,8 @@ class YaccParser < Parser
   def grammar
     return false unless lh
     space
+    c_comment
+    space
     puts "#{@tmp_rule.lh}: : is expected" unless check_token ":"
     rhs
     check_token ";"
@@ -212,7 +215,6 @@ class YaccParser < Parser
   
   def rhs
     rh
-    
     while true
       space
       if check_token("\\|")
@@ -233,10 +235,10 @@ class YaccParser < Parser
   def rh
     # 要変更
     # 空の配列が入る
-    @tmp_rule.rh.push Array.new(0) 
+    @tmp_rule.rh.push Array.new(0)
     while action do end
-    
-    while true      
+    while true
+      c_comment
       # ;なしで次の文法規則が定義された場合
       break if @input =~ /\A[a-z_]\w*\s*:/
 
@@ -245,7 +247,6 @@ class YaccParser < Parser
       else
         break
       end
-
       while action do end
     end
 
@@ -263,7 +264,10 @@ class YaccParser < Parser
   end
     
   def action
-    @input = $' if @input =~ /\A(?<paren>{('[^']*'|"[^"]*"|[^{}'"]+|\g<paren>)*})/
+    while @input =~ /\A(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})/
+      @input = $'
+      space
+    end
     $&
   end
 end
