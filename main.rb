@@ -49,7 +49,6 @@ elsif yacc_description
   grammar.translate
 elsif lex_description
   grammar = lex_description.parse
-  grammar.translate
 end
 
 case format_name
