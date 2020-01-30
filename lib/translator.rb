@@ -719,6 +719,7 @@ module EmptyRulesRemover
   # 空規則を除去
   # 空規則に%precが使われている場合があるため、separate_rhの後に使用
   def remove_empty_rules
+    return true if @grammar.empty?
     cnt = 0
     begin
       Timeout.timeout(10){
@@ -819,6 +820,7 @@ end
 
 module UnusedRulesRemover
   def remove_unused_rules
+    return true if @grammar.empty?
     used_lhs = []
     delete_lhs = []
     @grammar.each{|rule| rule.rh.each{|rh| rh.each{|r| used_lhs.push r unless used_lhs.include?(r) }}}
