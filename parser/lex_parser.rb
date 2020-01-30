@@ -49,9 +49,13 @@ class LexParser < Parser
       
       syms = [rh.other]
       if rh.last.empty?
-        tmp_syms = syms.join.split(/\//)
+        tmp_syms = []
+        syms[0].each{|item|
+          tmp_sym = item[0].split(/\//)
+          tmp_sym.each{|item2| tmp_syms.push [item2]}
+        }
+
         if tmp_syms.size > 1
-          tmp_syms.map!{|item| [item]}
           syms = [Repeat.new(tmp_syms)]
         else
           syms = [Repeat.new(syms)]
