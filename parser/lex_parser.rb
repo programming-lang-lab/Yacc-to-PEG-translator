@@ -49,20 +49,12 @@ class LexParser < Parser
       else
         @tmp_rule.lh = key + "_" + @@skip_rule.lh
       end
-      
       syms = [rh.other]
       if rh.last.empty?
-        tmp_syms = []
-        syms[0].each{|item|
-          tmp_sym = item[0].split(/(?!\/)\//)
-          tmp_sym.each{|item2| tmp_syms.push [item2]}
-        }
-
-        if tmp_syms.size > 1
-          syms = [Repeat.new(tmp_syms)]
-        else
-          syms = [Repeat.new(syms)]
+        if syms[0].size == 1 && syms[0].find{|item| item[0].split(/(?!\\\/)\//).size > 1}
+          syms[0][0][0] = "(" + syms[0][0][0] + ")"
         end
+        syms = [Repeat.new(syms)]
       else
         if rh.last.size == 1
           syms = [Repeat.new(["!"+rh.last[0]] + syms), rh.last[0]] 
@@ -75,7 +67,6 @@ class LexParser < Parser
           syms = [Repeat.new(["!"+lst] + syms), lst] 
         end
       end
-
       syms = [[rh.first] + syms] unless rh.first.empty?
 
       @tmp_rule.rh.push syms
@@ -88,7 +79,7 @@ class LexParser < Parser
   def constant
     return false unless (tmp = string)
     tmp_regexp = regexp.gsub("\\", "\\\\\\\\")
-    if tmp_regexp.index("/")
+    if tmp_regexp.index(/(?!\\\/)\//)
       @const[tmp] = "(" + tmp_regexp + ")"
     else
       @const[tmp] = tmp_regexp
@@ -293,7 +284,10 @@ class LexParser < Parser
   end
 
   def slash
-    return "\"\\/\"" if check_token "/"
+    if @input =~ /\A(?!\\\/)\//
+      @input = $'
+      return "\"\\/\""
+    end
     false
   end
 
@@ -329,7 +323,7 @@ class LexParser < Parser
     if @input =~ /\A(\\"|'|\\\\|\\\(|\\\)|\\{|\\}|\\\[|\\\]|\\\$|\\\?|=|\\>|\\<|\\!|\\\.|\\\||\\\+|\\\*|\\\^|\\~|\\|\/|;|:|,|@|#|>|<|-|&|\^|%|\w)+/
     # if @input =~ /\A(\\\"|\\\'|\\\\|\\\.|\\\(|\\\)|\\\{|\\\}|\\\[|\\\]|\\\$|\\\?|=|\\>|\\<|\\!|\\\||\\\+|\\\*|\\^|\\~|\\|\/|;|:|,|@|#|>|<|\-|&|\^|%|\w)+/
       @input = $'
-      return "\"" + $&.gsub(/\\([!<>|+*^\/.])/, '\1') + "\""
+      return "\"" + $&.gsub(/\\([!<>|+*^.])/, '\1') + "\""
     end
 
     false
@@ -346,7 +340,7 @@ class LexParser < Parser
   end
     
   def action
-    if @input =~ /\A[ \t\r\f\v]*(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})|\A(\\{|\\}|[^{}\n])+/
+    if @input =~ /\A[ \t\r\f\v]*(?<paren>{(\/\*(?~\*\/)\*\/|\/\/[^\n]*|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})|\A(\\{|\\}|[^{}\n])+/
       @input = $'
       pat = $&
       label = pat =~ /BEGIN\s*\(?\s*(\w+)\s*\)?/ ? $1 : nil
