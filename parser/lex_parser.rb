@@ -28,7 +28,7 @@ class LexParser < Parser
   end
 
   def parse
-    while option || option_s || option_x || code || constant do end
+    while option || option_s || option_x || top || code || constant do end
     space
     check_token "%%"
     space
@@ -111,7 +111,15 @@ class LexParser < Parser
     end 
     true
   end
-  
+
+  def top
+    return false unless check_token "%top{"
+    until check_token("}") do
+      check_token "[^\n]*\n"
+    end
+    true
+  end
+
   def code
     return false unless check_token "%{"
     until check_token("%}") do
