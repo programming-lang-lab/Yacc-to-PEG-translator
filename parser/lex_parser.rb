@@ -29,7 +29,6 @@ class LexParser < Parser
     space
     check_token "%%"
     space
-
     while !check_token("\\s*%%") && token do end
 
     unless (id_rule = @rules.find {|rh| rh.lh == @lex_id }).nil? || @reserved_words.empty?
@@ -39,7 +38,6 @@ class LexParser < Parser
         id_rule.rh.unshift [NegativeLookAHead.new(@reserved_words)]
       end
     end
-
     @@skip_rule.lh = "SPACE" unless @@skip_rule.rh.empty?
     @@skip_rule.rh.each{|key, rh|
       @tmp_rule = Rule.new
@@ -51,7 +49,13 @@ class LexParser < Parser
       
       syms = [rh.other]
       if rh.last.empty?
-        syms = [Repeat.new(syms)]
+        tmp_syms = syms.join.split(/\//)
+        if tmp_syms.size > 1
+          tmp_syms.map!{|item| [item]}
+          syms = [Repeat.new(tmp_syms)]
+        else
+          syms = [Repeat.new(syms)]
+        end
       else
         if rh.last.size == 1
           syms = [Repeat.new(["!"+rh.last[0]] + syms), rh.last[0]] 
@@ -83,10 +87,7 @@ class LexParser < Parser
   
   def option
     return false unless check_token("%option")
-    while (tmp = string) do
-      @state.push tmp
-      break if @input =~ /\A[ \t\r\f\v]*\n/
-    end 
+    check_token "[^\n]*\n"
     true
   end
   
@@ -124,7 +125,6 @@ class LexParser < Parser
     end
 
     return false unless (rh = regexp)
-
     if rh == "[^\n]" && tags[0] == "INITIAL"
       action 
       return false
@@ -134,7 +134,6 @@ class LexParser < Parser
     @tmp_rule.rh.push Array.new(0)
 
     ary, label = action
-
     label.upcase! if label
 
     if ary
@@ -151,7 +150,7 @@ class LexParser < Parser
         @reserved_word_flag = true  if str =~ /\A#{@lex_id}\Z/
 
         case str
-        when /[A-Z]\w*/
+        when /\w+/
           if label
             @@skip_rule.add_first str, label
             tags.each{|tag| @@skip_rule.add_last str, tag }
@@ -194,17 +193,17 @@ class LexParser < Parser
   end
   
   def token_type
-    if @input =~ /\A<[^<>]+>/
+    if @input =~ /\A(?!<<EOF>>)<[^<>]+>/
       @input = $'
-      return $&.scan(/\w+/)
+      return $&.scan(/[^<>]+/)
     end
     
     false
   end
 
   def regexp
-    ret = "" 
-    while (tmp = paren || class_char || constant_char || literal || or_operator || any_char || nonwrapped_string)
+    ret = ""
+    while (tmp = eof || regexp_option || paren || class_char || constant_char || literal || or_operator || any_char || nonwrapped_string)
       if (rep = repeat_operator)
         ret += tmp + rep + " "
       else
@@ -215,9 +214,37 @@ class LexParser < Parser
     return false if ret.empty?
     ret.rstrip!
   end
-    
+
+  def eof
+    if @input =~ /\A<<EOF>>/
+      @input = $'
+      return "<<EOF>>"
+    end
+    false
+  end
+
+  def regexp_option
+    if @input =~ /\A\(\?-?[imxos]:((?<paren>\((\\\)|[^()]|\g<paren>)*\))|[^()])*\)/
+      if @input[2] == "-"
+        op = @input[2..3]
+        @input.slice!(0..4)
+      else
+        op = @input[2]
+        @input.slice!(0..3)
+      end
+      unless (ret = regexp)
+        puts "paren: parse error."
+        exit 1
+      end
+      @input.slice!(0)
+      return "(?" + op + ret + ")"
+    end
+
+    false
+  end
+
   def paren
-    if @input =~ /\A\(((\\\)|[^)])*)\)/
+    if @input =~ /\A(?<paren>\((\\\)|[^()]|\g<paren>)*\))/
       @input.slice!(0)
       unless (ret = regexp)
         puts "paren: parse error."
@@ -231,7 +258,7 @@ class LexParser < Parser
   end
 
   def class_char
-    if @input =~ /\A\[(\\\]|[^\]])*\]/
+    if @input =~ /\A(?<paren>\[(\\\]|[^\[\]]|\g<paren>)*\])/
       @input = $'
       return $&.gsub(/([^\w])-/){"#{$1}\\-"}.gsub(/(?!\\'|\\")('|")/){"\\#{$1}"}
     end
@@ -243,8 +270,10 @@ class LexParser < Parser
     if @input =~ /\A{(\\}|[^}])*}/
       @input = $'
       ret = $&
-      # 定数の除去
-      @const.each{|k, v| break if ret.gsub!("{#{k}}", v) }
+      if ret =~ /\w+/
+        # 定数の除去
+        @const.each{|k, v| break if ret.gsub!("{#{k}}", v) }
+      end
       return ret
     end
 
@@ -299,16 +328,16 @@ class LexParser < Parser
   end
     
   def action
-    if @input =~ /\A(?<paren>{('[^']*'|"[^"]*"|[^{}'"]+|\g<paren>)*})/
+    if @input =~ /\A(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})|(\\{|\\}|[^{}\n])+/
       @input = $'
       pat = $&
       label = pat =~ /BEGIN\s*\(?\s*(\w+)\s*\)?/ ? $1 : nil
 
       case pat
-      when /return\s*\(?([a-z_]\w*)\([^)]*\)/
+      when /return\s*\(?(\w+)\([^)]*\)/
         if @input =~ /int #{$1}\s*(?<paren>\((\'[^\']*\'|\"[^\"]*\"|[^\(\)\'\"]+|\g<paren>)*\))\s*(?<paren2>\{(\'[^\']*\'|\"[^\"]*\"|[^{}\'\"]+|\g<paren2>)*\})/
-          ret = $&.scan(/(?<=return)\s*\(?\s*[A-Z]\w*/)
-          ret.each_with_index{|r, idx| ret[idx] = r.slice(/[A-Z]\w*/).strip }
+          ret = $&.scan(/(?<=return)\s*\(?\s*\w+/)
+          ret.each_with_index{|r, idx| ret[idx] = r.slice(/\w+/).strip }
 
           return [ret.uniq, label]
         end
