@@ -14,6 +14,7 @@ class YaccParser < Parser
                              :debug,
                              :name,
                              :verbose,
+                             :destructor,
                              :printer,
                              :union,
                              :code,
@@ -44,7 +45,7 @@ class YaccParser < Parser
   end
 
   def parse
-    while token || type || start || debug || define || name || verbose || printer || union || code || header || expect || pure_parser || lex_param || parse_param || name_prefix || error_verbose || dir_require || locations || initial_action || right || left || precedence || nonassoc do end
+    while token || type || start || debug || define || name || verbose || destructor || printer || union || code || header || expect || pure_parser || lex_param || parse_param || name_prefix || error_verbose || dir_require || locations || initial_action || right || left || precedence || nonassoc do end
     space
     check_token "%%"
     grammars
@@ -94,6 +95,12 @@ class YaccParser < Parser
 
   def verbose
     return false unless check_token("%verbose")
+    @input.sub!(/[^\n]*\n/, '')
+    true
+  end
+
+  def destructor
+  return false unless check_token("%destructor ")
     @input.sub!(/[^\n]*\n/, '')
     true
   end
