@@ -12,25 +12,30 @@ class YaccParser < Parser
                              :type,
                              :start,
                              :debug,
+                             :name,
+                             :verbose,
+                             :printer,
                              :union,
                              :code,
+                             :header,
                              :expect,
                              :precedence,
                              :nonassoc,
                              :pure_parser,
                              :lex_param,
                              :parse_param,
+                             :name_prefix,
+                             :error_verbose,
+                             :dir_require,
+                             :locations,
+                             :initial_action,
                              :left,
                              :right,
                              :empty,
                              :prec,
                              :action,
                              :string,
-                             :grammar]],
-                           
-                           [[:space],
-                            [:initial_action]],
-
+                             :grammar]]
                            #                           [[:c_comment],
                            #[:grammars]]
                            ]
@@ -39,11 +44,9 @@ class YaccParser < Parser
   end
 
   def parse
-    while token || type || start || debug || define || union || code || expect || pure_parser || lex_param || parse_param || name_prefix || error_verbose || dir_require || locations || initial_action || right || left || precedence || nonassoc do
-    end
+    while token || type || start || debug || define || name || verbose || printer || union || code || header || expect || pure_parser || lex_param || parse_param || name_prefix || error_verbose || dir_require || locations || initial_action || right || left || precedence || nonassoc do end
     space
     check_token "%%"
-
     grammars
     check_token "%%"
     super
@@ -83,15 +86,41 @@ class YaccParser < Parser
     true
   end
 
+  def name
+    return false unless check_token("%name")
+    @input.sub!(/[^\n]*\n/, '')
+    true
+  end
+
+  def verbose
+    return false unless check_token("%verbose")
+    @input.sub!(/[^\n]*\n/, '')
+    true
+  end
+
+  def printer
+    return false unless @input =~ /\A%printer\s*(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})\s*(<?\w*>?\s*)+(;\s*)?/
+    @input = $'
+    true
+  end
+
   def union
     return false unless check_token("%union")
-    @input.sub!(/(?<paren>{('[^']*'|"[^"]*"|[^{}'"]+|\g<paren>)*})\s*/, '')
+    @input.sub!(/(?<paren>{('[^']*'|"[^"]*"|[^{}'"]+|\g<paren>)*})(\s*;\s*)?/, '')
   end
   
   def code
-    check_token("%{(?~%})%}|%code\\s*(requires|provides|top|imports)?\\s*{[^}]*}")
+    return false unless @input =~ /\A%{(?~%})%}|\A%code\s*(requires|provides|top|imports)?\s*(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})(\s*;\s*)?/
+    @input = $'
+    true
   end
-  
+
+  def header
+    return false unless @input =~ /\A%header\s*(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})/
+    @input = $'
+    true
+  end
+
   def expect
     return false unless check_token("%expect")
     @input.sub!(/[^\n]*\n/, '')
@@ -141,8 +170,8 @@ class YaccParser < Parser
   end
 
   def initial_action
-    return false unless check_token("%initial-action")
-    @input.sub!(/(?<paren>{('[^']*'|"[^"]*"|[^{}'"]+|\g<paren>)*})\s*;\s*/, '')
+    return false unless @input =~ /\A%initial-action\s*(?<paren>{(\/\*(?~\*\/)\*\/|"(\\"|[^"])*"|'(\\'|[^'])*'|((?!\/\*)(\\'|\\"|[^{}'"]))+|\g<paren>)*})(\s*;\s*)?/
+    @input = $'
     true
   end
 
@@ -270,7 +299,7 @@ class YaccParser < Parser
     while true
       c_comment
       # ;なしで次の文法規則が定義された場合
-      break if @input =~ /\A[a-z_]\w*\s*:/
+      break if @input =~ /\A[a-z_][\w.]*\s*:/
 
       if (tmp = string || literal || empty || prec)
         @tmp_rule.rh.last.push tmp
@@ -283,9 +312,13 @@ class YaccParser < Parser
     true
   end
 
+  def string
+    check_token "[a-zA-Z_][\\w\\.]*"
+  end
+
   def literal
     # 括弧を使うとエラーが出る
-    if @input =~ /\A'(\\'|[^'])*'/
+    if @input =~ /\A('(\\'|[^'])*'|"(\\"|[^"])*")/
       @input = $'
       $&
     else
