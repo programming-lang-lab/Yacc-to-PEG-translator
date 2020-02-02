@@ -224,7 +224,7 @@ module RhOrderSolver
   # shift / reduce conflictを解決
   def solve_rh_order
     @grammar.each{|rule|
-      next if rule.lh =~ /[A-Z]\w*/ || (size = rule.rh.size) < 2
+      next if rule.lh =~ /\A[A-Z]\w*/ || (size = rule.rh.size) < 2
 
       sorted_rh_order = Hash.new{|h,k| h[k] = Hash.new}
       loop do
@@ -232,7 +232,6 @@ module RhOrderSolver
         (0...size - 1).each {|i|
           (i + 1...size).each {|j|
             next if sorted_rh_order[(rh = rule.rh[i])][(rh2 = rule.rh[j])]
-
             # shift / reduce conflictが起きる場合
             if rh2.size >= rh.size && rh2.join.start_with?(rh.join)
               sorted_rh_order[rh2][rh] = true
