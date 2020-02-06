@@ -213,8 +213,12 @@ class LexParser < Parser
   end
 
   def regexp
-    ret = ""
-    while (tmp = eof || regexp_option || paren || class_char || constant_char || literal || slash || or_operator || any_char || nonwrapped_string)
+    if caret
+      ret = "^"
+    else
+      ret = ""
+    end
+    while (tmp =  eof || regexp_option || paren || class_char || constant_char || literal || slash || or_operator || any_char || nonwrapped_string)
       if (rep = repeat_operator)
         ret += tmp + rep + " "
       else
@@ -230,6 +234,14 @@ class LexParser < Parser
     if @input =~ /\A<<EOF>>/
       @input = $'
       return "<<EOF>>"
+    end
+    false
+  end
+
+  def caret
+    if @input =~ /\A\^/
+      @input = $'
+      return "^"
     end
     false
   end
@@ -369,10 +381,19 @@ class LexParser < Parser
       # 演算子などの文字を返す場合
       when /return\s*\(?('[^']')/
         return false, false
+      when /return\s*\(?\s*\w+::(\w+)/
+        ret = pat.scan(/(?<=return)\s*\(?\s*\w+::\w+/)
+        return false, label if ret.empty?
+        ret.each_with_index do |r, idx|
+          r.sub!(/\w+::/, '')
+          ret[idx] = r.slice(/\w+/).strip
+        end
+
+        return [ret.uniq, label]
       else
         ret = pat.scan(/(?<=return)\s*\(?\s*\w+/)
         return false, label if ret.empty?
-        ret.each_with_index{|r, idx| ret[idx] = r.slice(/\w+/).strip } 
+        ret.each_with_index{|r, idx| ret[idx] = r.slice(/\w+/).strip }
 
         return [ret.uniq, label]
       end
