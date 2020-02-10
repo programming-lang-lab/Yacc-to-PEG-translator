@@ -8,9 +8,23 @@ module SkipSymbolInserter
     @grammar.each{|rule|
       case rule.lh
       when /\A(?![^\s]*#{@skip_lh})[A-Z]\w*/
-        rule.rh.each{|rh|
-          unless rh[0] !~ /\A(?!"WORD")"\w+"\Z/
-            rh.push "!WORD"
+        if rule.rh.is_a?(Choice)
+          rule.rh.child.each{|rh|
+            unless rh[0] !~ /\A(?!"WORD")"\w+"\Z/
+              rh.push NegativeLookAHead.new(["WORD"])
+              unless @words_flag
+                @words_flag = true
+                tmp_rule = Rule.new "WORD"
+                tmp_rule.rh = [["[a-zA-Z_0-9]"]]
+                @grammar.push tmp_rule
+              end
+            end
+            rh.push @skip_lh if skip_flag
+          }
+        else
+          rh = rule.rh
+          if rh[0] =~ /\A(?!"WORD")"\w+"\Z/
+            rh.push NegativeLookAHead.new(["WORD"])
             unless @words_flag
               @words_flag = true
               tmp_rule = Rule.new "WORD"
@@ -19,14 +33,16 @@ module SkipSymbolInserter
             end
           end
           rh.push @skip_lh if skip_flag
-        }
+        end
       when /\A(?!#{@skip_lh})[a-z_]\w*/
         next unless skip_flag
-        rule.rh.each{|rh|
-          rh.each_with_index{|r, idx|
-            rh.insert(idx+1, @skip_lh) if r =~ /'(\\'|[^'])*'|"(\\"|[^"])*"/
+        if rule.rh.is_a?(Choice)
+          rule.rh.child.each{|rh|
+            rh.each_with_index{|r, idx| rh.insert(idx+1, @skip_lh) if r =~ /'(\\'|[^'])*'|"(\\"|[^"])*"/ }
           }
-        }
+        else
+          rule.rh.each_with_index{|rh, idx| rh.insert(idx+1, @skip_lh) if rh =~ /'(\\'|[^'])*'|"(\\"|[^"])*"/ }
+        end
       else
         # type code here
       end
@@ -45,12 +61,12 @@ module RhSeparater
         next
       end
 
-      next if rule.lh =~ /[A-Z]\w*/ || rule.rh.size < 2
+      next if rule.lh =~ /[A-Z]\w*/ || !rule.rh.is_a?(Choice)
       not_shaped_rh = Struct.new(:prio, :rh, :type)
       not_shaped_rhs = []
       no_op_rhs = []
 
-      rule.rh.each{|rh|
+      rule.rh.child.each{|rh|
         prio = nil
         unop = 0
 
@@ -190,7 +206,11 @@ module RhSeparater
 =end
       else
         rh_stock.unshift [lh_with_idx_next]
-        tmp_rule.rh = rh_stock
+        if rh_stock.size > 1
+          tmp_rule.rh = Choice.new(rh_stock)
+        else
+          tmp_rule.rh = rh_stock
+        end
         rh_stock = []
         idx_of_devined_rh += 1
         @grammar.insert idx, tmp_rule
@@ -208,13 +228,17 @@ module RhSeparater
         @grammar.insert idx, Rule.new(lh_with_idx_next, [[""]])
       end
     elsif rh_stock.empty?
-      @grammar.insert idx, Rule.new(lh_with_idx_next, no_op_rhs)
+      if no_op_rhs.size > 1
+        @grammar.insert idx, Rule.new(lh_with_idx_next, Choice.new(no_op_rhs))
+      else
+        @grammar.insert idx, Rule.new(lh_with_idx_next, no_op_rhs)
+      end
     else
       case idx_of_devined_rh
       when 1
-        @grammar.insert idx, Rule.new(lh, rh_stock + no_op_rhs)
+        @grammar.insert idx, Rule.new(lh, Choice.new(rh_stock + no_op_rhs))
       else
-        @grammar.insert idx, Rule.new(lh_with_idx, rh_stock + no_op_rhs)
+        @grammar.insert idx, Rule.new(lh_with_idx, Choice.new(rh_stock + no_op_rhs))
       end
     end
   end
@@ -224,18 +248,20 @@ module RhOrderSolver
   # shift / reduce conflictを解決
   def solve_rh_order
     @grammar.each{|rule|
-      next if rule.lh =~ /\A[A-Z]\w*/ || (size = rule.rh.size) < 2
-
+      next if rule.lh =~ /\A[A-Z]\w*/ || !rule.rh.is_a?(Choice)
+      size = rule.rh.child.size
       sorted_rh_order = Hash.new{|h,k| h[k] = Hash.new}
       loop do
         break_flag = false
         (0...size - 1).each {|i|
           (i + 1...size).each {|j|
-            next if sorted_rh_order[(rh = rule.rh[i])][(rh2 = rule.rh[j])]
+
+            next if sorted_rh_order[(rh = rule.rh.child[i])][(rh2 = rule.rh.child[j])]
             # shift / reduce conflictが起きる場合
+
             if rh2.size >= rh.size && rh2.join.start_with?(rh.join)
               sorted_rh_order[rh2][rh] = true
-              rule.rh[i], rule.rh[j] = rule.rh[j], rule.rh[i]
+              rule.rh.child[i], rule.rh.child[j] = rule.rh.child[j], rule.rh.child[i]
 
               # shift / reduce conflictが起きるが正しくソートされている場合
               #            elsif rh.size <= rh2.size && rh2.join.start_with?(rh.join)
@@ -276,7 +302,7 @@ module RhOrderSolver
 
                   matched_syms.map!{|syms| [[syms[-1][0]], syms]}
                   matched_syms2.map!{|syms| [[syms[-1][0]], syms]}
-#=begin
+                  #=begin
                   puts "Order of right hand side may be wrong.\n#{rule.lh}: #{rh.join(" ")}\n#{' '*rule.lh.size}| #{rh2.join(" ")}"
                   print "Both rules lead \"#{matched_syms[0][0][0]}\""
 
@@ -301,7 +327,7 @@ module RhOrderSolver
                   }
                   puts "\n"
 #=end
-                  # 全ての受理可能な入力の導出
+# 全ての受理可能な入力の導出
 =begin
                   loop do
                     p "afdgafh"
@@ -317,7 +343,7 @@ module RhOrderSolver
                       if (tmp = calc_follow(syms[1...syms.size])).empty?
                         rh_pos += 1
                         if rh_pos < rh.size
-                          tmp = calc_first(rh[rh_pos], rh_pos, [rule.lh])
+                          tmp = calc_first(rh_pos], rh_pos, [rule.lh])
                           tmp.each{|el| tmp_matched_syms += [syms + [el]] }
                         else
                           tmp_matched_syms += [syms + [[[]]]]
@@ -424,22 +450,44 @@ module RhOrderSolver
     return [] if stack.any?{|st| st == lh }
     return @first_set[lh] unless @first_set[lh].empty?
 
-    tmp.rh.each{|r|
-      tmp_idx = (r[0].is_a?(Repeat) || r[0].is_a?(NegativeLookAHead)) && r.size > 1 && !(r[1].is_a?(Repeat) || r[1].is_a?(NegativeLookAHead)) ? 1 : 0
-      case r[tmp_idx]
-      when /[a-z]\w*/
-        calc_first(r[tmp_idx], tmp_idx, stack + [lh]).each{|el|
-          @first_set[lh] += [[[lh, idx]] + el]
-        }
-      when nil
-      else
+    case tmp.rh.class.name
+    when "Choice"
+      tmp.rh.child.each{|r|
+        tmp_idx = (r[0].is_a?(Repeat) || r[0].is_a?(NegativeLookAHead)) && r.size > 1 && !(r[1].is_a?(Repeat) || r[1].is_a?(NegativeLookAHead)) ? 1 : 0
+        case r[tmp_idx]
+        when /[a-z]\w*/
+          calc_first(r[tmp_idx], tmp_idx, stack + [lh]).each{|el|
+            @first_set[lh] += [[[lh, idx]] + el]
+          }
+        when nil
+        else
 #       if (pair = @token_pairs.find{|item| item.find{|it| it == r[tmp_idx]}})
 #         @first_set[lh] +=  [[[lh, idx], [pair.join, tmp_idx]]]
 #       else
-        @first_set[lh] +=  [[[lh, idx], [r[tmp_idx], tmp_idx]]]
+          @first_set[lh] +=  [[[lh, idx], [r[tmp_idx], tmp_idx]]]
 #       end
-      end
-    }
+        end
+      }
+    when "Array"
+      rh = tmp.rh
+      tmp_idx = (rh[0].is_a?(Repeat) || rh[0].is_a?(NegativeLookAHead)) && rh.size > 1 && !(rh[1].is_a?(Repeat) || rh[1].is_a?(NegativeLookAHead)) ? 1 : 0
+        case rh[tmp_idx]
+        when /[a-z]\w*/
+          calc_first(rh[tmp_idx], tmp_idx, stack + [lh]).each{|el|
+            @first_set[lh] += [[[lh, idx]] + el]
+          }
+        when nil
+        else
+#       if (pair = @token_pairs.find{|item| item.find{|it| it == r[tmp_idx]}})
+#         @first_set[lh] +=  [[[lh, idx], [pair.join, tmp_idx]]]
+#       else
+          @first_set[lh] +=  [[[lh, idx], [rh[tmp_idx], tmp_idx]]]
+#       end
+        end
+    else
+      # do nothing
+    end
+
     unless stack.empty? && idx == 0
       ret = @first_set[lh]
       @first_set.delete(lh)
@@ -552,9 +600,16 @@ module LeftRecursionsRemover
 
   def remove_direct_left_recursions
     @grammar.each{|rule|
-      if rule.rh.any?{|rh| rh[0] == rule.lh}
-        # 直接左再帰
-        remove_direct_left_recursion rule, rule.lh
+      if rule.rh.is_a?(Choice)
+        if rule.rh.child.any?{|rh| rh[0] == rule.lh}
+          # 直接左再帰
+          remove_direct_left_recursion rule, rule.lh
+        end
+      else
+        if rule.rh[0] == rule.lh
+          # 直接左再帰
+          rule.rh = OneOrMore.new(rule.rh[1...rule.rh.size])
+        end
       end
     }
   end
@@ -565,13 +620,54 @@ module LeftRecursionsRemover
     ret = @recursion_memo[rule.lh][stack.join]
     return ret unless ret.nil?
 
-      rule.rh.each{|rh|
-      next if rule.lh == rh[0]
+    if rule.rh.is_a?(Choice)
+      rule.rh.child.each{|rh|
+        next if rule.lh == rh[0]
+        idx = stack.index{|st| st == rh[0]}
+        case idx
+        when nil
+          if rh[0] =~ /\A[a-z]\w*\Z/
+            next unless (tmp = @grammar.find{|rl| rl.lh == rh[0]})
+            case check_indirect_left_recursion tmp, stack+[rh[0]]
+            when 0
+              return @recursion_memo[rule.lh][stack.join] = 0
+            when false
+              return @recursion_memo[rule.lh][stack.join] = false
+            when true
+              # do nothing
+            else
+              puts "The value is invalid."
+              exit 1
+            end
+            return @recursion_memo[rule.lh][stack.join] = false unless check_indirect_left_recursion(tmp, stack+[rh[0]])
+          end
+        else
+          dir_rec = nil
+          if @grammar.any?{|rl| stack[idx+1...stack.size].any?{|st| st == rl.lh && (dir_rec = rl.rh.child.find{|r| r[0] == rl.lh }) }}
+            puts "The translator can't remove an indirect left recursion:"
+            print "  #{stack[idx]}"
+            (idx+1...stack.size).each{|i|
+              print " -> #{stack[i]}"
+            }
+            print " -> #{rh[0]}\n"
+            puts "due to a left recursion:\n  #{dir_rec[0]}"
+            return @recursion_memo[rule.lh][stack.join] = 0
+          end
+
+          # 間接左再帰
+          remove_indirect_left_recursion rule, stack[idx...stack.size]
+          # ここでbreakすることで文法規則が変換された後に変換前のスタックに基づいて左再帰の検出が行われることを防ぐ
+          return @recursion_memo[rule.lh][stack.join] = false
+        end
+      }
+    else
+      rh = rule.rh
+      return @recursion_memo[rule.lh][stack.join] = true if rule.lh == rh[0]
       idx = stack.index{|st| st == rh[0]}
       case idx
       when nil
         if rh[0] =~ /\A[a-z]\w*\Z/
-          next unless (tmp = @grammar.find{|rl| rl.lh == rh[0]})
+          return @recursion_memo[rule.lh][stack.join] = true unless (tmp = @grammar.find{|rl| rl.lh == rh[0]})
           case check_indirect_left_recursion tmp, stack+[rh[0]]
           when 0
             return @recursion_memo[rule.lh][stack.join] = 0
@@ -587,7 +683,7 @@ module LeftRecursionsRemover
         end
       else
         dir_rec = nil
-        if @grammar.any?{|rl| stack[idx+1...stack.size].any?{|st| st == rl.lh && (dir_rec = rl.rh.find{|r| r[0] == rl.lh }) }}
+        if @grammar.any?{|rl| stack[idx+1...stack.size].any?{|st| st == rl.lh && (dir_rec = rl.rh.child.find{|r| r[0] == rl.lh }) }}
           puts "The translator can't remove an indirect left recursion:"
           print "  #{stack[idx]}"
           (idx+1...stack.size).each{|i|
@@ -603,18 +699,20 @@ module LeftRecursionsRemover
         # ここでbreakすることで文法規則が変換された後に変換前のスタックに基づいて左再帰の検出が行われることを防ぐ
         return @recursion_memo[rule.lh][stack.join] = false
       end
-    }
+    end
+
     @recursion_memo[rule.lh][stack.join] = true
   end
 
   # 文法規則の除去は全ての演算が終わった後に行う
   # ruleをsymに関して直接左再帰の除去を行う
+  # 複数の右辺を持つ規則のみ扱う
   # 空規則に非対応
   def remove_direct_left_recursion rule, sym
     # 再帰を含む文法規則
-    matched_rule = rule.rh.find_all{|rh| rh[0] == sym }
+    matched_rule = rule.rh.child.find_all{|rh| rh[0] == sym }
     # 再帰を含まない文法規則
-    unmatched_rule = rule.rh.reject{|rh| rh[0] == sym }
+    unmatched_rule = rule.rh.child.reject{|rh| rh[0] == sym }
 
     tmp_rule = []
     matched_rule.each{|rl| tmp_rule.push rl[1...rl.size]}
@@ -626,18 +724,19 @@ module LeftRecursionsRemover
     if tmp_rule[0].empty?
       rule.rh = [[unmatched_rule]]
     else
+      tmp_rule = Choice.new(tmp_rule) if tmp_rule.size > 1
       # 新しい文法規則の生成
       case unmatched_rule.size
         # 再帰にならない右辺が空規則しかなく、空規則の除去器で空規則が除去されている場合
       when 0
-        rule.rh = [[OneOrMore.new(tmp_rule)]]
+        rule.rh = OneOrMore.new(tmp_rule)
       when 1
-        rule.rh = [unmatched_rule[0].push(Repeat.new(tmp_rule))]
+        rule.rh = unmatched_rule[0].push(Repeat.new(tmp_rule))
       else
-        rule.rh = [[unmatched_rule, Repeat.new(tmp_rule)]]
+        rule.rh = [Choice.new(unmatched_rule), Repeat.new(tmp_rule)]
       end
     end
-    flatten_rule(rule)
+    flatten_rh(rule.rh)
   end
 
   def remove_indirect_left_recursion rule, stack
@@ -649,8 +748,8 @@ module LeftRecursionsRemover
       assigned_rule = @grammar.find{|rl| rl.lh == stack.last}
 
       # 代入される記号の検索
-      matched_rule = assigned_rule.rh.find_all{|rh| rh[0] == st}
-      unmatched_rule = assigned_rule.rh.reject{|rh| rh[0] == st}
+      matched_rule = assigned_rule.rh.child.find_all{|rh| rh[0] == st}
+      unmatched_rule = assigned_rule.rh.child.reject{|rh| rh[0] == st}
 
       tmp_rule = []
       matched_rule.each{|rl| tmp_rule.push rl[1...rl.size] if rl.size > 1 }
@@ -661,28 +760,29 @@ module LeftRecursionsRemover
         when 1
           case rule.rh[0].size
           when 1
-            assigned_rule.rh = [rule.rh[0][0]] + unmatched_rule
+            assigned_rule.rh = Choice.new([rule.rh[0][0]] + unmatched_rule)
           else
-            assigned_rule.rh = [rule.rh[0]] + unmatched_rule
+            assigned_rule.rh = Choice.new([rule.rh[0]] + unmatched_rule)
           end
         else
-          assigned_rule.rh = [[rule.rh]] + unmatched_rule
+          assigned_rule.rh = Choice.new([Choice.new([[rule.rh]])] + unmatched_rule)
         end
       else
         case rule.rh.size
         when 1
           case rule.rh[0].size
           when 1
-            assigned_rule.rh = [rule.rh[0][0] + tmp_rule] + unmatched_rule
+            assigned_rule.rh = Choice.new([[Choice.new([rule.rh[0][0]])] + tmp_rule] + unmatched_rule)
           else
-            assigned_rule.rh = [rule.rh[0], tmp_rule] + unmatched_rule
+            assigned_rule.rh = Choice.new([[Choice.new(rule.rh[0])] + tmp_rule] + unmatched_rule)
           end
         else
-          assigned_rule.rh = [[rule.rh] + tmp_rule] + unmatched_rule
+          assigned_rule.rh = Choice.new([[Choice.new(rule.rh)] + tmp_rule] + unmatched_rule)
         end
       end
       # 代入される文法規則
-      rule = flatten_rule(assigned_rule)
+      assigned_rule.rh = flatten_rh(assigned_rule.rh)
+      rule = assigned_rule
     }
   end
 
@@ -695,22 +795,27 @@ module LeftRecursionsRemover
   # a <- A B D
   #    / C D
   #    / E
-  def flatten_rule rule
-    return rule unless rule.rh[0][0].is_a?(Array)
-
+  def flatten_rh rh
     tmp_rh = []
-
-    rule.rh[0][0].each{|item|
-      tmp_rh.push item + rule.rh[0][1...rule.rh[0].size]
-    }
-
-    if rule.rh.size == 1
-      rule.rh = tmp_rh
+    case rh.class.name
+    when "Choice"
+      rh.child.each{|item|
+        if (ret = flatten_rh(item)).is_a?(Choice)
+          ret.child.each{|item2| tmp_rh.push item2 }
+        else
+          tmp_rh.push item
+        end
+      }
+    when "Array"
+      if rh[0].is_a?(Choice)
+        rh[0].child.each{|item| tmp_rh.push item + rh[1...rh.size] }
+      else
+        tmp_rh.push rh
+      end
     else
-      rule.rh = tmp_rh + rule.rh[1...rule.rh.size]
+      # do nothing
     end
-
-    rule
+    Choice.new(tmp_rh)
   end
 end
 
@@ -728,26 +833,80 @@ module EmptyRulesRemover
           loop_flag = false
 
           @grammar[1...@grammar.size].each{|rule|
-            next unless (idx = rule.rh.index{|rh| rh[0] == "" })
             loop_flag = true
             # ruleに空規則しかない場合
-            if (rh_size = rule.rh.size) == 1
-              @grammar.delete_if{|rl| rl.lh == rule.lh}
+            if rule.rh.is_a?(Choice)
+              next unless (idx = rule.rh.child.index{|rh| rh[0] == "" })
+              rh_size = rule.rh.child.size
+              if rh_size > 2
+                rule.rh.child.delete_at(idx)
+              else
+                rule.rh.child.delete_at(idx)
+                rule.rh = rule.rh.child[0]
+              end
             else
-              rule.rh.delete_at(idx)
+              next unless rule.rh[0] == ""
+              idx = 0
+              rh_size = 1
+              @grammar.delete_if{|rl| rl.lh == rule.lh}
             end
             @grammar.each{|rule2|
               # 空規則を含む右辺にマッチしたとき、右辺を増やすため1つの右辺の処理を飛ばす必要がある
               skip_cnt = 0
 
-              rule2.rh.each_with_index {|rh, rh_idx|
-                unless skip_cnt == 0
-                  skip_cnt -= 1
-                  next
-                end
-                next unless rh.any?{|r| r == rule.lh}
+              if rule2.rh.is_a?(Choice)
+                rule2.rh.child.each_with_index {|rh, rh_idx|
+                  unless skip_cnt == 0
+                    skip_cnt -= 1
+                    next
+                  end
+                  next unless rh.any?{|r| r == rule.lh}
 
-                matched_idx = 0
+                  matched_idx = 0
+                  rh.each_with_index{|r, r_idx|
+                    if r == rule.lh
+                      tmp_rh = rh[0...r_idx] + rh[r_idx+1...rh.size]
+                    else
+                      next
+                    end
+
+                    # 空規則を除去して他の文法規則で空規則が発生する場合
+                    if tmp_rh.empty?
+                      tmp_rh = [""]
+                      # 空規則の除去して右辺に左辺と一致しているものが発生する場合に削除
+                      # stmts <- stmt
+                      #        / stmts stmt
+                      #        / stmts
+                    elsif tmp_rh.size == 1
+                      # 無限ループを検出した場合に文法規則の右辺に挿入しない
+                      if tmp_rh[0] == rule2.lh
+                        next
+                      else
+                        next if check_infinite_loop [rule2.lh]+tmp_rh
+                      end
+
+                      # 空規則の直前に否定先読みがある場合
+                    else
+                      tmp_rh.pop if tmp_rh.last.is_a?(NegativeLookAHead)
+                    end
+                    # ruleに空規則しかない場合に他の文法規則に現れるその規則を全て削除
+                    if rh_size == 1
+                      rule2.rh.child[rh_idx] = tmp_rh
+                    else
+                      if idx == 0
+                        rule2.rh.child.insert(rh_idx+matched_idx, tmp_rh)
+                      else
+                        rule2.rh.child.insert(rh_idx+matched_idx+1, tmp_rh)
+                      end
+                      skip_cnt += 1
+                    end
+                    matched_idx += 1
+                  }
+                }
+                rule2.rh.child = rule2.rh.child.uniq
+              else
+                rh = rule2.rh
+                next unless rh.any?{|r| r == rule.lh}
                 rh.each_with_index{|r, r_idx|
                   if r == rule.lh
                     tmp_rh = rh[0...r_idx] + rh[r_idx+1...rh.size]
@@ -776,19 +935,17 @@ module EmptyRulesRemover
                   end
                   # ruleに空規則しかない場合に他の文法規則に現れるその規則を全て削除
                   if rh_size == 1
-                    rule2.rh[rh_idx] = tmp_rh
+                    rh = tmp_rh
                   else
                     if idx == 0
-                      rule2.rh.insert(rh_idx+matched_idx, tmp_rh)
+                      rh = Choice.new([tmp_rh] + [rh])
                     else
-                      rule2.rh.insert(rh_idx+matched_idx+1, tmp_rh)
+                      rh = Choice.new([rh] + [tmp_rh])
                     end
-                    skip_cnt += 1
                   end
-                  matched_idx += 1
                 }
-              }
-              rule2.rh = rule2.rh.uniq
+                rule2.rh.child = rule2.rh.child.uniq
+              end
             }
           }
           break unless loop_flag
@@ -822,7 +979,14 @@ module UnusedRulesRemover
     return true if @grammar.empty?
     used_lhs = []
     delete_lhs = []
-    @grammar.each{|rule| rule.rh.each{|rh| rh.each{|r| used_lhs.push r unless used_lhs.include?(r) }}}
+    # IDENT が消える
+    @grammar.each do |rule|
+      if rule.rh.is_a?(Choice)
+        rule.rh.child.each{|rh| rh.each{|r| used_lhs.push r unless used_lhs.include?(r) }}
+      else
+        rule.rh.each{|rh| used_lhs.push rh unless used_lhs.include?(rh) }
+      end
+    end
     @grammar[1...@grammar.size].each{|rule| delete_lhs.push rule.lh unless used_lhs.include?(rule.lh) }
     @grammar.delete_if{|rule| delete_lhs.include?(rule.lh)}
   end

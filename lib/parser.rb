@@ -36,10 +36,10 @@ class Rule
 end
 
 Precedence = Struct.new(:type, :value)
-Repeat = Struct.new(:rule)
-NegativeLookAHead = Struct.new(:rule)
-OneOrMore = Struct.new(:rule)
-#Choice = Struct.new(:rule)
+Repeat = Struct.new(:child)
+NegativeLookAHead = Struct.new(:child)
+OneOrMore = Struct.new(:child)
+Choice = Struct.new(:child)
 
 class SkipRh
   attr_accessor :first, :last, :other
