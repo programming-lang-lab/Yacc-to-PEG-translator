@@ -12,12 +12,12 @@ class PackCCGenerator < Generator
       @peg.each{|rule|
         @indent.push rule.lh.size + 1
         code += "#{rule.lh} <- "
-        if rule.rh.is_a?(Choice)
-          (rule.rh.child.size-1).times{|n| code += generate_rh(rule.rh.child[n]) + "\n" + " "*@indent.last + " / " }
-          code += generate_rh(rule.rh.child.last) + "\n\n"
-        else
-          code += generate_rh(rule.rh) + "\n\n"
-        end
+        
+        (rule.rh.size-1).times{|n|
+          code += generate_rh(rule.rh[n]) + "\n" + " "*@indent.last + " / "
+        }
+        
+        code += generate_rh(rule.rh.last) + "\n\n"
         @indent.pop
       }
       code += "%%\n int main(){\n  #{name}_context_t *ctx = #{name}_create(NULL);\n  #{name}_parse(ctx, NULL);\n  #{name}_destroy(ctx);\n  return 0;\n}\n"

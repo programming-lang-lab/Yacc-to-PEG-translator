@@ -27,14 +27,28 @@ class Generator
   end
 
   def join_array ary, out_of_array = true
-    code = ""
-    ary.each{|sym| code += send("join_#{sym.class.name.downcase}", sym, out_of_array)}
+    # ただの記号列の場合
+    if ary.find{|a| a.is_a?(String)}
+      code = ""
+      ary.each{|sym| code += send("join_#{sym.class.name.downcase}", sym, out_of_array)}
+
+    # 選択肢の場合
+    else
+      return send("join_#{ary[0].class.name.downcase}", ary[0], false) if ary.size < 2
+      @indent.push @indent.last + 2
+      code = send("join_#{ary[0].class.name.downcase}", ary[0], false)
+#      @indent[-1] -= 1
+      ary.drop(1).each{|sym| code += "\n" + " "*@indent.last + "/ " + send("join_#{sym.class.name.downcase}", sym, false) }
+      @indent.pop
+      code = "(" + code.rstrip + ")"
+#      @indent[-1] = code[/[^\n]*\Z/].size - 1
+    end
     code
   end
 
   def join_repeat rpt, out_of_array = true
-    code = send("join_#{rpt.child.class.name.downcase}", rpt.child)
-    ary = rpt.child
+    code = send("join_#{rpt.rule.class.name.downcase}", rpt.rule)
+    ary = rpt.rule
     if judge_param code, ary
       code = "(" + code.rstrip + ")* " 
     else
@@ -44,8 +58,8 @@ class Generator
   end
 
   def join_negativelookahead neg, out_of_array = true
-    code = send("join_#{neg.child.class.name.downcase}", neg.child)
-    ary = neg.child
+    code = send("join_#{neg.rule.class.name.downcase}", neg.rule)
+    ary = neg.rule
     if judge_param code, ary
       code = "!(" + code.rstrip + ") " 
     else
@@ -55,8 +69,8 @@ class Generator
   end
 
   def join_oneormore one, out_of_array = true
-    code = send("join_#{one.child.class.name.downcase}", one.child)
-    ary = one.child
+    code = send("join_#{one.rule.class.name.downcase}", one.rule)
+    ary = one.rule
     if judge_param code, ary
       code = "(" + code.rstrip + ")+ "
     else
@@ -64,16 +78,7 @@ class Generator
     end
     code
   end
-
-  def join_choice choices, out_of_array = true
-    code = send("join_#{choices.child[0].class.name.downcase}", choices.child[0], false)
-    #@indent.push @indent.last + 2
-#      @indent[-1] -= 1
-    choices.child.drop(1).each{|sym| code += "\n" + " "*@indent.last + "/ " + send("join_#{sym.class.name.downcase}", sym, false) }
-    @indent.pop
-    "(" + code.rstrip + ")"
-  end
-
+  
   def join_nilclass sym, out_of_array = true
     ""
   end

@@ -35,8 +35,11 @@ class LexParser < Parser
     while !check_token("\\s*%%") && token do end
 
     unless (id_rule = @rules.find {|rh| rh.lh == @lex_id }).nil? || @reserved_words.empty?
-      @reserved_words = Choice.new(@reserved_words) if @reserved_words.size > 1
-      id_rule.rh.unshift NegativeLookAHead.new @reserved_words
+      if id_rule.rh.size == 1
+        id_rule.rh[0].unshift NegativeLookAHead.new @reserved_words
+      else
+        id_rule.rh.unshift [NegativeLookAHead.new(@reserved_words)]
+      end
     end
     @@skip_rule.lh = "SPACE" unless @@skip_rule.rh.empty?
     @@skip_rule.rh.each{|key, rh|
@@ -49,14 +52,19 @@ class LexParser < Parser
       syms = [rh.other]
       if rh.last.empty?
         if syms[0].size == 1 && syms[0].find{|item| item[0].split(/(?!\\\/)\//).size > 1}
-          syms[0][0][0] = Choice.new(syms[0][0][0])
+          syms[0][0][0] = "(" + syms[0][0][0] + ")"
         end
         syms = [Repeat.new(syms)]
       else
         if rh.last.size == 1
-          syms = [Repeat.new([NegativeLookAHead.new([rh.last[0]])] + syms), rh.last[0]]
+          syms = [Repeat.new(["!"+rh.last[0]] + syms), rh.last[0]] 
         else
-          syms = [Repeat.new([NegativeLookAHead.new(Choice.new(rh.last))] + syms), Choice.new(rh.last)]
+          lst = "(" + rh.last[0]
+          rh.last.drop(1).each{|item|
+            lst += " / " + item
+          }
+          lst += ")"
+          syms = [Repeat.new(["!"+lst] + syms), lst] 
         end
       end
       syms = [[rh.first] + syms] unless rh.first.empty?
@@ -165,20 +173,11 @@ class LexParser < Parser
             else
               @tmp_rule.lh = tag + "_" + str
             end
+          
             if (tmp = @rules.find { |rl| rl.lh == @tmp_rule.lh })
-              if tmp.rh.is_a?(Choice)
-                tmp.rh.child.push @tmp_rule.rh
-              else
-                tmp.rh = Choice.new([tmp.rh, @tmp_rule.rh])
-              end
+              tmp.rh = tmp.rh + @tmp_rule.rh
             else
-              if @tmp_rule.rh.size > 1
-                @tmp_rule.rh = Choice.new(@tmp_rule.rh)
-                @rules.push @tmp_rule
-              else
-                @tmp_rule.rh = @tmp_rule.rh[0]
-                @rules.push @tmp_rule
-              end
+              @rules.push @tmp_rule
             end
           }
         when /'(\\'|[^'])+'/
