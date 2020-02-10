@@ -292,8 +292,17 @@ class YaccParser < Parser
 
     @tmp_rule.rh.map!{|rh| rh.empty? ? [''] : rh }
     if (tmp = @rules.find { |rl| rl.lh == @tmp_rule.lh })
-      tmp.rh = tmp.rh + @tmp_rule.rh
+      if tmp.rh.is_a?(Choice)
+        tmp.rh.child = tmp.rh.child + @tmp_rule.rh
+      else
+        tmp.rh = Choice.new(tmp.rh + @tmp_rule.rh)
+      end
     else
+      if @tmp_rule.rh.size > 1
+        @tmp_rule.rh = Choice.new(@tmp_rule.rh)
+      else
+        @tmp_rule.rh = @tmp_rule.rh[0]
+      end
       @rules.push @tmp_rule
     end
   end
