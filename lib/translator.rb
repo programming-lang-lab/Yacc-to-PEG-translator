@@ -217,7 +217,7 @@ module RhSeparater
         idx += 1
       end
       no_left_oprs_stock = no_left_oprs + no_left_oprs_stock
-      no_right_oprs_stock += no_right_oprs
+      no_right_oprs_stock = no_right_oprs + no_right_oprs_stock
     }
 
     if (rh_stock + no_op_rhs).empty?
@@ -253,9 +253,11 @@ module RhOrderSolver
       sorted_rh_order = Hash.new{|h,k| h[k] = Hash.new}
       loop do
         break_flag = false
+        order = []
+        rule.rh.child.each{|item| order.push item[0]}
+        order.uniq!
         (0...size - 1).each {|i|
           (i + 1...size).each {|j|
-
             next if sorted_rh_order[(rh = rule.rh.child[i])][(rh2 = rule.rh.child[j])]
             # shift / reduce conflictが起きる場合
 
@@ -266,6 +268,8 @@ module RhOrderSolver
               # shift / reduce conflictが起きるが正しくソートされている場合
               #            elsif rh.size <= rh2.size && rh2.join.start_with?(rh.join)
             else
+              rule.rh.child[i], rule.rh.child[j] = rule.rh.child[j], rule.rh.child[i] if order.index{|item| item == rule.rh.child[i][0]} > order.index{|item| item == rule.rh.child[j][0]}
+=begin
               # 直接再帰の検出
               #next if rh.find{|r| r == rule.lh } || rh2.find{|r| r == rule.lh }
 
@@ -326,7 +330,6 @@ module RhOrderSolver
                     puts ""
                   }
                   puts "\n"
-#=end
 # 全ての受理可能な入力の導出
 =begin
                   loop do
@@ -423,9 +426,10 @@ module RhOrderSolver
                     }
                     break if break_flag
                   }
-=end
+#=end
                 end
               end
+=end
             end
             break if break_flag
           }
@@ -642,6 +646,18 @@ module LeftRecursionsRemover
             return @recursion_memo[rule.lh][stack.join] = false unless check_indirect_left_recursion(tmp, stack+[rh[0]])
           end
         else
+          stack[idx+1...stack.size].each do |st|
+            next if (rl = @grammar.find{|tmp_rl| tmp_rl.lh == st}).nil?
+            if rl.rh.is_a?(Choice) && rl.rh.child.find{|r| r[0] == st }
+              remove_direct_left_recursion rl, st
+              if rl.rh[0].is_a?(Choice)
+                tmp_rh = []
+                rl.rh[0].child.each{|r| tmp_rh.push r + rl.rh[1...rh.size] }
+                rl.rh = Choice.new(tmp_rh)
+              end
+            end
+          end
+=begin
           dir_rec = nil
           if @grammar.any?{|rl| stack[idx+1...stack.size].any?{|st| st == rl.lh && (dir_rec = rl.rh.child.find{|r| r[0] == rl.lh }) }}
             puts "The translator can't remove an indirect left recursion:"
@@ -653,7 +669,7 @@ module LeftRecursionsRemover
             puts "due to a left recursion:\n  #{dir_rec[0]}"
             return @recursion_memo[rule.lh][stack.join] = 0
           end
-
+=end
           # 間接左再帰
           remove_indirect_left_recursion rule, stack[idx...stack.size]
           # ここでbreakすることで文法規則が変換された後に変換前のスタックに基づいて左再帰の検出が行われることを防ぐ
@@ -682,8 +698,18 @@ module LeftRecursionsRemover
           return @recursion_memo[rule.lh][stack.join] = false unless check_indirect_left_recursion(tmp, stack+[rh[0]])
         end
       else
-        dir_rec = nil
-        if @grammar.any?{|rl| stack[idx+1...stack.size].any?{|st| st == rl.lh && (dir_rec = rl.rh.child.find{|r| r[0] == rl.lh }) }}
+        stack[idx+1...stack.size].each do |st|
+          next if (rl = @grammar.find{|tmp_rl| tmp_rl.lh == st}).nil?
+          if rl.rh.child.find{|r| r[0] == st }
+            remove_direct_left_recursion rl, st
+            if rl.rh[0].is_a?(Choice)
+              tmp_rh = []
+              rl.rh[0].child.each{|r| tmp_rh.push r + rl.rh[1...rh.size] }
+              rl.rh = Choice.new(tmp_rh)
+            end
+          end
+        end
+=begin
           puts "The translator can't remove an indirect left recursion:"
           print "  #{stack[idx]}"
           (idx+1...stack.size).each{|i|
@@ -692,8 +718,7 @@ module LeftRecursionsRemover
           print " -> #{rh[0]}\n"
           puts "due to a left recursion:\n  #{dir_rec[0]}"
           return @recursion_memo[rule.lh][stack.join] = 0
-        end
-
+=end
         # 間接左再帰
         remove_indirect_left_recursion rule, stack[idx...stack.size]
         # ここでbreakすることで文法規則が変換された後に変換前のスタックに基づいて左再帰の検出が行われることを防ぐ
@@ -713,7 +738,6 @@ module LeftRecursionsRemover
     matched_rule = rule.rh.child.find_all{|rh| rh[0] == sym }
     # 再帰を含まない文法規則
     unmatched_rule = rule.rh.child.reject{|rh| rh[0] == sym }
-
     tmp_rule = []
     matched_rule.each{|rl| tmp_rule.push rl[1...rl.size]}
 
@@ -762,7 +786,7 @@ module LeftRecursionsRemover
           when 1
             assigned_rule.rh = Choice.new([rule.rh[0][0]] + unmatched_rule)
           else
-            assigned_rule.rh = Choice.new([rule.rh[0]] + unmatched_rule)
+            assigned_rule.rh = Choice.new([rule.rh] + unmatched_rule)
           end
         else
           assigned_rule.rh = Choice.new([Choice.new([[rule.rh]])] + unmatched_rule)
@@ -813,7 +837,7 @@ module LeftRecursionsRemover
         tmp_rh.push rh
       end
     else
-      # do nothing
+      return rh
     end
     Choice.new(tmp_rh)
   end
@@ -1028,12 +1052,12 @@ class Translator
   def translate
     divide_rh
     return self unless remove_empty_rules
-    remove_direct_left_recursions
+    insert_skip_symbol
     #return self
     return self unless check_indirect_left_recursions
+    return self
     remove_unused_rules
     solve_rh_order
-    insert_skip_symbol
     remove_direct_left_recursions
     self
   end

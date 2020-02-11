@@ -89,7 +89,7 @@ class Generator
     code = code.split("\n")
     code.each_with_index do |line, idx|
       case line
-      when /\)\(/
+      when /\)\([^)]*\Z/
         @choice_indent = line[/(\s\S+)+\)\(/].size - 3
       when /\)/
         code[idx] = line[/\A\s*/] + " "*@choice_indent + line[/\S.*\Z/]
