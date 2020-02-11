@@ -4,6 +4,7 @@ class Generator
     @peg = grammar.grammar
     @start_symbol = grammar.start_symbol
     @indent = [0]
+    @choice_indent = 0
   end
 
   def generate filename
@@ -11,7 +12,6 @@ class Generator
       puts "filename is not defined."
       exit 1
     end
-
   end
 
   def generate_rh rh
@@ -28,7 +28,9 @@ class Generator
 
   def join_array ary, out_of_array = true
     code = ""
-    ary.each{|sym| code += send("join_#{sym.class.name.downcase}", sym, out_of_array)}
+    ary.each do |sym|
+      code += send("join_#{sym.class.name.downcase}", sym, out_of_array)
+    end
     code
   end
 
@@ -67,7 +69,7 @@ class Generator
 
   def join_choice choices, out_of_array = true
     code = send("join_#{choices.child[0].class.name.downcase}", choices.child[0], false)
-    #@indent.push @indent.last + 2
+    @indent.push @indent.last + 2
 #      @indent[-1] -= 1
     choices.child.drop(1).each{|sym| code += "\n" + " "*@indent.last + "/ " + send("join_#{sym.class.name.downcase}", sym, false) }
     @indent.pop
@@ -81,5 +83,23 @@ class Generator
   def judge_param code, ary
     code != '(' && (ary.size > 1 && ary.find{|a| a.is_a?(String)} \
       || (ary.size == 1 && ary.find{|a| a.is_a?(Array) && a.size > 1 && a.find{|b| b.is_a?(String)}}))
+  end
+
+  def fix_indent code
+    code = code.split("\n")
+    code.each_with_index do |line, idx|
+      case line
+      when /\)\(/
+        @choice_indent = line[/(\s\S+)+\)\(/].size - 3
+      when /\)/
+        code[idx] = line[/\A\s*/] + " "*@choice_indent + line[/\S.*\Z/]
+        @choice_indent = 0
+      when /\A\S|\A\Z/
+        # do nothing
+      else
+        code[idx] = line[/\A\s*/] + " "*@choice_indent + line[/\S.*\Z/]
+      end
+    end
+    code.join("\n")
   end
 end

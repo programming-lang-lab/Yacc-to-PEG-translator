@@ -18,7 +18,7 @@ class PEGGenerator < Generator
         end
         @indent.pop
       }
-      file.write code.rstrip
+      file.write fix_indent(code).rstrip
     }
     
     exit 0

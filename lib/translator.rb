@@ -1028,6 +1028,8 @@ class Translator
   def translate
     divide_rh
     return self unless remove_empty_rules
+    remove_direct_left_recursions
+    #return self
     return self unless check_indirect_left_recursions
     remove_unused_rules
     solve_rh_order
