@@ -777,7 +777,14 @@ module LeftRecursionsRemover
 
       tmp_rule = []
       matched_rule.each{|rl| tmp_rule.push rl[1...rl.size] if rl.size > 1 }
-      tmp_rule = tmp_rule[0] if tmp_rule.size == 1
+      case tmp_rule.size
+      when 1
+        tmp_rule = tmp_rule[0]
+      when 0
+      else
+        tmp_rule = [Choice.new(tmp_rule)]
+      end
+
       case tmp_rule.empty?
       when true
         case rule.rh.size
