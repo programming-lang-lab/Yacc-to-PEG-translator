@@ -1,0 +1,270 @@
+%prefix "rust_expr2"
+
+start <- SPACE program 
+       / SPACE 
+
+program <- expr 
+
+expr <- expr2 
+      / BOX expr 
+
+expr2 <- expr3 DOTDOT expr3 
+       / expr3 DOTDOT BOX expr 
+       / expr3 
+
+expr3 <- expr4 
+       / RETURN expr3 
+       / RETURN BOX expr 
+       / YIELD expr3 
+       / YIELD BOX expr 
+
+expr4 <- expr5 '=' SPACE expr4 
+       / expr5 '=' SPACE RETURN expr3 
+       / expr5 '=' SPACE YIELD expr3 
+       / expr5 '=' SPACE BOX expr 
+       / expr5 SHLEQ expr4 
+       / expr5 SHLEQ RETURN expr3 
+       / expr5 SHLEQ YIELD expr3 
+       / expr5 SHLEQ BOX expr 
+       / expr5 SHREQ expr4 
+       / expr5 SHREQ RETURN expr3 
+       / expr5 SHREQ YIELD expr3 
+       / expr5 SHREQ BOX expr 
+       / expr5 MINUSEQ expr4 
+       / expr5 MINUSEQ RETURN expr3 
+       / expr5 MINUSEQ YIELD expr3 
+       / expr5 MINUSEQ BOX expr 
+       / expr5 ANDEQ expr4 
+       / expr5 ANDEQ RETURN expr3 
+       / expr5 ANDEQ YIELD expr3 
+       / expr5 ANDEQ BOX expr 
+       / expr5 OREQ expr4 
+       / expr5 OREQ RETURN expr3 
+       / expr5 OREQ YIELD expr3 
+       / expr5 OREQ BOX expr 
+       / expr5 PLUSEQ expr4 
+       / expr5 PLUSEQ RETURN expr3 
+       / expr5 PLUSEQ YIELD expr3 
+       / expr5 PLUSEQ BOX expr 
+       / expr5 STAREQ expr4 
+       / expr5 STAREQ RETURN expr3 
+       / expr5 STAREQ YIELD expr3 
+       / expr5 STAREQ BOX expr 
+       / expr5 SLASHEQ expr4 
+       / expr5 SLASHEQ RETURN expr3 
+       / expr5 SLASHEQ YIELD expr3 
+       / expr5 SLASHEQ BOX expr 
+       / expr5 CARETEQ expr4 
+       / expr5 CARETEQ RETURN expr3 
+       / expr5 CARETEQ YIELD expr3 
+       / expr5 CARETEQ BOX expr 
+       / expr5 PERCENTEQ expr4 
+       / expr5 PERCENTEQ RETURN expr3 
+       / expr5 PERCENTEQ YIELD expr3 
+       / expr5 PERCENTEQ BOX expr 
+       / expr5 
+
+expr5 <- expr6 
+           (OROR expr6 
+          / OROR RETURN expr3 
+          / OROR YIELD expr3 
+          / OROR BOX expr)* 
+
+expr6 <- expr7 
+           (ANDAND expr7 
+          / ANDAND RETURN expr3 
+          / ANDAND YIELD expr3 
+          / ANDAND BOX expr)* 
+
+expr7 <- expr8 
+           (EQEQ expr8 
+          / EQEQ RETURN expr3 
+          / EQEQ YIELD expr3 
+          / EQEQ BOX expr 
+          / NE expr8 
+          / NE RETURN expr3 
+          / NE YIELD expr3 
+          / NE BOX expr)* 
+
+expr8 <- expr9 
+           ('<' SPACE expr9 
+          / '<' SPACE RETURN expr3 
+          / '<' SPACE YIELD expr3 
+          / '<' SPACE BOX expr 
+          / '>' SPACE expr9 
+          / '>' SPACE RETURN expr3 
+          / '>' SPACE YIELD expr3 
+          / '>' SPACE BOX expr 
+          / LE expr9 
+          / LE RETURN expr3 
+          / LE YIELD expr3 
+          / LE BOX expr 
+          / GE expr9 
+          / GE RETURN expr3 
+          / GE YIELD expr3 
+          / GE BOX expr)* 
+
+expr9 <- expr10 
+           ('|' SPACE expr10 
+          / '|' SPACE RETURN expr3 
+          / '|' SPACE YIELD expr3 
+          / '|' SPACE BOX expr)* 
+
+expr10 <- expr11 
+            ('^' SPACE expr11 
+           / '^' SPACE RETURN expr3 
+           / '^' SPACE YIELD expr3 
+           / '^' SPACE BOX expr)* 
+
+expr11 <- expr12 
+            ('&' SPACE expr12 
+           / '&' SPACE RETURN expr3 
+           / '&' SPACE YIELD expr3 
+           / '&' SPACE BOX expr)* 
+
+expr12 <- expr13 
+            (SHL expr13 
+           / SHL RETURN expr3 
+           / SHL YIELD expr3 
+           / SHL BOX expr 
+           / SHR expr13 
+           / SHR RETURN expr3 
+           / SHR YIELD expr3 
+           / SHR BOX expr)* 
+
+expr13 <- expr14 
+            ('+' SPACE expr14 
+           / '+' SPACE RETURN expr3 
+           / '+' SPACE YIELD expr3 
+           / '+' SPACE BOX expr 
+           / '-' SPACE expr14 
+           / '-' SPACE RETURN expr3 
+           / '-' SPACE YIELD expr3 
+           / '-' SPACE BOX expr)* 
+
+expr14 <- expr15 
+            ('*' SPACE expr15 
+           / '*' SPACE RETURN expr3 
+           / '*' SPACE YIELD expr3 
+           / '*' SPACE BOX expr 
+           / '/' SPACE expr15 
+           / '/' SPACE RETURN expr3 
+           / '/' SPACE YIELD expr3 
+           / '/' SPACE BOX expr 
+           / '%' SPACE expr15 
+           / '%' SPACE RETURN expr3 
+           / '%' SPACE YIELD expr3 
+           / '%' SPACE BOX expr)* 
+
+expr15 <- (expr16 
+         / '(' SPACE maybe_exprs ')' SPACE 
+         / '(' SPACE ')' SPACE 
+         / '[' SPACE vec_expr ']' SPACE 
+         / '[' SPACE ']' SPACE)
+          ('.' SPACE LIT_INTEGER 
+         / '[' SPACE maybe_expr ']' SPACE 
+         / '[' SPACE ']' SPACE 
+         / '(' SPACE maybe_exprs ')' SPACE 
+         / '(' SPACE ')' SPACE)* 
+
+expr16 <- lit 
+        / CONTINUE ident 
+        / CONTINUE 
+        / BREAK ident 
+        / BREAK 
+
+vec_expr <- maybe_exprs 
+          / exprs ';' SPACE expr 
+
+maybe_exprs <- exprs ',' SPACE 
+             / exprs 
+
+maybe_expr <- expr 
+
+exprs <- expr ',' SPACE expr* 
+
+lit <- LIT_INTEGER 
+     / LIT_FLOAT 
+     / TRUE 
+     / FALSE 
+
+ident <- IDENT 
+
+BOX <- "box" !WORD SPACE 
+
+BREAK <- "break" !WORD SPACE 
+
+CONTINUE <- "continue" !WORD SPACE 
+
+FALSE <- "false" !WORD SPACE 
+
+RETURN <- "return" !WORD SPACE 
+
+TRUE <- "true" !WORD SPACE 
+
+YIELD <- "yield" !WORD SPACE 
+
+IDENT <- !(BOX 
+         / BREAK 
+         / CONTINUE 
+         / FALSE 
+         / RETURN 
+         / TRUE 
+         / YIELD) [a-zA-Z_] [a-zA-Z0-9_]* SPACE 
+
+LIT_INTEGER <- "0x" [0-9a-fA-F_]+ SPACE 
+             / "0o" [0-7_]+ SPACE 
+             / "0b" [01_]+ SPACE 
+             / [0-9] [0-9_]* SPACE 
+             / [0-9] [0-9_]* "." ("." / [a-zA-Z]) SPACE 
+
+LIT_FLOAT <- [0-9] [0-9_]* "." [0-9_]* ([eE] [\-\+]? [0-9_]+)? SPACE 
+           / [0-9] [0-9_]* ("." [0-9_]*)? [eE] [\-\+]? [0-9_]+ SPACE 
+
+DOTDOT <- ".." SPACE 
+
+EQEQ <- "==" SPACE 
+
+NE <- "!=" SPACE 
+
+LE <- "<=" SPACE 
+
+SHLEQ <- "<<=" SPACE 
+
+SHL <- "<<" SPACE 
+
+GE <- ">=" SPACE 
+
+SHREQ <- ">>=" SPACE 
+
+SHR <- ">>" SPACE 
+
+MINUSEQ <- "-=" SPACE 
+
+ANDAND <- "&&" SPACE 
+
+ANDEQ <- "&=" SPACE 
+
+OROR <- "||" SPACE 
+
+OREQ <- "|=" SPACE 
+
+PLUSEQ <- "+=" SPACE 
+
+STAREQ <- "*=" SPACE 
+
+SLASHEQ <- "\/=" SPACE 
+
+CARETEQ <- "^=" SPACE 
+
+PERCENTEQ <- "%=" SPACE 
+
+SPACE <- [ \n\t\r]* 
+
+%%
+ int main(){
+  rust_expr2_context_t *ctx = rust_expr2_create(NULL);
+  rust_expr2_parse(ctx, NULL);
+  rust_expr2_destroy(ctx);
+  return 0;
+}

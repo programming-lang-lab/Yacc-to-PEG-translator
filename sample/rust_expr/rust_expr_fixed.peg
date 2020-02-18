@@ -1,0 +1,359 @@
+%prefix "rust_expr"
+%header {
+  #include <stdio.h>
+  #include <string.h>
+  #include <stdarg.h>
+   typedef struct node{
+     char name[15];
+     struct node *children[10];
+   }Node;
+   void make_dot(Node*);
+   void make_arrow(Node*, char*);
+   void make_node(Node*, char*, int, ...);
+}
+%value "Node*"
+
+start <- SPACE ___:program { make_dot(___); }
+       / SPACE
+
+program <- ___:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "program", 1, ___); }
+
+expr <- ___1:expr2 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr", 1, ___1); }
+      / ___1:BOX ___2:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr", 2, ___1, ___2); }
+
+expr2 <- ___1:expr3 ___2:DOTDOT ___3:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr2", 3, ___1, ___2, ___3); }
+       / ___1:expr3 ___2:DOTDOT ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr2", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr2", 1, ___1); }
+
+expr3 <- ___1:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr3", 1, ___1); }
+       / ___1:RETURN ___2:BOX ___3:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr3", 3, ___1, ___2, ___3); }
+       / ___1:YIELD ___2:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr3", 2, ___1, ___2); }
+       / ___1:YIELD ___2:BOX ___3:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr3", 3, ___1, ___2, ___3); }
+       / ___1:RETURN ___2:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr3", 2, ___1, ___2); }
+
+expr4 <- ___1:expr5 '=' SPACE ___2:expr4 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'='", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, l, ___2); }
+       / ___1:expr5 '=' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'='", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, l, ___2, ___3); }
+       / ___1:expr5 '=' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'='", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, l, ___2, ___3); }
+       / ___1:expr5 '=' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'='", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, l, ___2, ___3); }
+       / ___1:expr5 ___2:SHLEQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:SHLEQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:SHLEQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:SHLEQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:SHREQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:SHREQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:SHREQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:SHREQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:MINUSEQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:MINUSEQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:MINUSEQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:MINUSEQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:ANDEQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:ANDEQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:ANDEQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:ANDEQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:OREQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:OREQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:OREQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:OREQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:PLUSEQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:PLUSEQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:PLUSEQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:PLUSEQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:STAREQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:STAREQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:STAREQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:STAREQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:SLASHEQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:SLASHEQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:SLASHEQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:SLASHEQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:CARETEQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:CARETEQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:CARETEQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:CARETEQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:PERCENTEQ ___3:expr4 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 3, ___1, ___2, ___3); }
+       / ___1:expr5 ___2:PERCENTEQ ___3:RETURN ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:PERCENTEQ ___3:YIELD ___4:expr3 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 ___2:PERCENTEQ ___3:BOX ___4:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 4, ___1, ___2, ___3, ___4); }
+       / ___1:expr5 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr4", 1, ___1); }
+
+expr5 <- ___1:expr6 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr5", 1, ___1); } (___2:OROR ___3:expr6 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr5", 3, $$, ___2, ___3); $$ = n; }
+              / ___2:OROR ___3:RETURN ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr5", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:OROR ___3:YIELD ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr5", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:OROR ___3:BOX ___4:expr { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr5", 4, $$, ___2, ___3, ___4); $$ = n; }
+              )*
+
+expr6 <- ___1:expr7 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr6", 1, ___1); }  (___2:ANDAND ___3:RETURN ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr6", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:ANDAND ___3:YIELD ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr6", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:ANDAND ___3:BOX ___4:expr { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr6", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:ANDAND ___3:expr7 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr6", 3, $$, ___2, ___3); $$ = n; }
+              )*
+
+expr7 <- ___1:expr8 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr7", 1, ___1); } (___2:EQEQ ___3:RETURN ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr7", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:EQEQ ___3:YIELD ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr7", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:EQEQ ___3:BOX ___4:expr { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr7", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:EQEQ ___3:expr8 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr7", 3, $$, ___2, ___3); $$ = n; }
+              / ___2:NE ___3:RETURN ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr7", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:NE ___3:YIELD ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr7", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:NE ___3:BOX ___4:expr { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr7", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:NE ___3:expr8 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr7", 3, $$, ___2, ___3); $$ = n; }
+)*
+
+expr8 <- ___1:expr9 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr8", 1, ___1); } ('<' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'<'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, l, ___2, ___3); $$ = n; }
+              / '<' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'<'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, l, ___2, ___3); $$ = n; }
+              / '<' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'<'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, l, ___2, ___3); $$ = n; }
+              / '<' SPACE ___2:expr9 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'<'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 3, $$, l, ___2); $$ = n; }
+              / '>' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'>'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, l, ___2, ___3); $$ = n; }
+              / '>' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'>'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, l, ___2, ___3); $$ = n; }
+              / '>' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'>'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, l, ___2, ___3); $$ = n; }
+              / '>' SPACE ___2:expr9 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'>'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 3, $$, l, ___2); $$ = n; }
+              / ___2:LE ___3:RETURN ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:LE ___3:YIELD ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:LE ___3:BOX ___4:expr { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:LE ___3:expr9 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 3, $$, ___2, ___3); $$ = n; }
+              / ___2:GE ___3:RETURN ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:GE ___3:YIELD ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:GE ___3:BOX ___4:expr { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 4, $$, ___2, ___3, ___4); $$ = n; }
+              / ___2:GE ___3:expr9 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr8", 3, $$, ___2, ___3); $$ = n; }
+)*
+
+expr9 <- ___1:expr10 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr9", 1, ___1); } ('|' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'|'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr9", 4, $$, l, ___2, ___3); $$ = n; }
+               / '|' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'|'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr9", 4, $$, l, ___2, ___3); $$ = n; }
+               / '|' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'|'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr9", 4, $$, l, ___2, ___3); $$ = n; }
+               / '|' SPACE ___2:expr10 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'|'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr9", 3, $$, l, ___2); $$ = n; }
+               )*
+
+expr10 <- ___1:expr11 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr10", 1, ___1); } ('^' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'^'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr10", 4, $$, l, ___2, ___3); $$ = n; }
+                / '^' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'^'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr10", 4, $$, l, ___2, ___3); $$ = n; }
+                / '^' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'^'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr10", 4, $$, l, ___2, ___3); $$ = n; }
+                / '^' SPACE ___2:expr11 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'^'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr10", 3, $$, l, ___2); $$ = n; }
+                )*
+
+expr11 <- ___1:expr12 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr11", 1, ___1); } ('&' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'&'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr11", 4, $$, l, ___2, ___3); $$ = n; }
+                / '&' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'&'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr11", 4, $$, l, ___2, ___3); $$ = n; }
+                / '&' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'&'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr11", 4, $$, l, ___2, ___3); $$ = n; }
+                / '&' SPACE ___2:expr12 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'&'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr11", 3, $$, l, ___2); $$ = n; }
+                )*
+
+expr12 <- ___1:expr13 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr12", 1, ___1); } (___2:SHL ___3:RETURN ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr12", 4, $$, ___2, ___3, ___4); $$ = n; }
+                / ___2:SHL ___3:YIELD ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr12", 4, $$, ___2, ___3, ___4); $$ = n; }
+                / ___2:SHL ___3:BOX ___4:expr { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr12", 4, $$, ___2, ___3, ___4); $$ = n; }
+                / ___2:SHL ___3:expr13 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr12", 3, $$, ___2, ___3); $$ = n; }
+                / ___2:SHR ___3:RETURN ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr12", 4, $$, ___2, ___3, ___4); $$ = n; }
+                / ___2:SHR ___3:YIELD ___4:expr3 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr12", 4, $$, ___2, ___3, ___4); $$ = n; }
+                / ___2:SHR ___3:BOX ___4:expr { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr12", 4, $$, ___2, ___3, ___4); $$ = n; }
+                / ___2:SHR ___3:expr13 { Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr12", 3, $$, ___2, ___3); $$ = n; }
+)*
+
+expr13 <- ___1:expr14 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr13", 1, ___1); } ('+' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'+'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr13", 4, $$, l, ___2, ___3); $$ = n; }
+                / '+' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'+'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr13", 4, $$, l, ___2, ___3); $$ = n; }
+                / '+' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'+'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr13", 4, $$, l, ___2, ___3); $$ = n; }
+                / '+' SPACE ___2:expr14 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'+'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr13", 3, $$, l, ___2); $$ = n; }
+                / '-' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'-'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr13", 4, $$, l, ___2, ___3); $$ = n; }
+                / '-' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'-'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr13", 4, $$, l, ___2, ___3); $$ = n; }
+                / '-' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'-'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr13", 4, $$, l, ___2, ___3); $$ = n; }
+                / '-' SPACE ___2:expr14 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'-'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr13", 3, $$, l, ___2); $$ = n; }
+)*
+
+expr14 <- ___1:expr15 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr14", 1, ___1); } ('*' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'*'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '*' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'*'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '*' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'*'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '*' SPACE ___2:expr15 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'*'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 3, $$, l, ___2); $$ = n; }
+                / '/' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'/'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '/' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'/'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '/' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'/'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '/' SPACE ___2:expr15 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'/'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 3, $$, l, ___2); $$ = n; }
+                / '%' SPACE ___2:RETURN ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'%'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '%' SPACE ___2:YIELD ___3:expr3 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'%'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '%' SPACE ___2:BOX ___3:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'%'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 4, $$, l, ___2, ___3); $$ = n; }
+                / '%' SPACE ___2:expr15 { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'%'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr14", 3, $$, l, ___2); $$ = n; }
+)*
+
+expr15 <- ___1:expr16 { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr15", 1, ___1); } ('.' SPACE ___2:LIT_INTEGER { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'.'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, l, ___2); $$ = n; }
+                / '[' SPACE ___2:maybe_expr ']' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'['", 0); Node *m = (Node *)malloc(sizeof(Node)); make_node(m, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, l, ___2, m); $$ = n; }
+                / '[' SPACE ']' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'['", 0); Node *m = (Node *)malloc(sizeof(Node)); make_node(m, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, l, m); $$ = n; }
+                / '(' SPACE ___2:maybe_exprs ')' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'('", 0); Node *m = (Node *)malloc(sizeof(Node)); make_node(m, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, l, ___2, m); $$ = n; }
+                / '(' SPACE ')' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'('", 0); Node *m = (Node *)malloc(sizeof(Node)); make_node(m, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, l, m); $$ = n; }
+)*
+    / '(' SPACE ___1:maybe_exprs ')' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'('", 0); Node *m = (Node *)malloc(sizeof(Node)); make_node(m, "')'", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr15", 3, l, ___1, m); } ('.' SPACE ___2:LIT_INTEGER { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'.'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, ___2); $$ = n; }
+                      / '[' SPACE ___2:maybe_expr ']' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'['", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, o, ___2, p); $$ = n; }
+                      / '[' SPACE ']' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'['", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, p); $$ = n; }
+                      / '(' SPACE ___2:maybe_exprs ')' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'('", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, o, ___2, p); $$ = n; }
+                      / '(' SPACE ')' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'('", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, p); $$ = n; }
+      )*
+    / '(' SPACE ')' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'('", 0); Node *m = (Node *)malloc(sizeof(Node)); make_node(m, "')'", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr15", 2, l, m); } ('.' SPACE ___2:LIT_INTEGER { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'.'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, l, ___2); $$ = n; }
+                      / '[' SPACE ___:maybe_expr ']' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'['", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, o, ___, p); $$ = n; }
+                      / '[' SPACE ']' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'['", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, p); $$ = n; }
+                      / '(' SPACE ___:maybe_exprs ')' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'('", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, o, ___, p); $$ = n; }
+                      / '(' SPACE ')' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'('", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, p); $$ = n; }
+      )*
+    / '[' SPACE ___1:vec_expr ']' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'['", 0); Node *m = (Node *)malloc(sizeof(Node)); make_node(m, "']'", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr15", 3, l, ___1, m); } ('.' SPACE ___2:LIT_INTEGER { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'.'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, ___2); $$ = n; }
+                      / '[' SPACE ___2:maybe_expr ']' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'['", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, o, ___2, p); $$ = n; }
+                      / '[' SPACE ']' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'['", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, p); $$ = n; }
+                      / '(' SPACE ___2:maybe_exprs ')' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'('", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, o, ___2, p); $$ = n; }
+                      / '(' SPACE ')' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'('", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, p); $$ = n; }
+      )*
+    / '[' SPACE ']' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "'['", 0); Node *m = (Node *)malloc(sizeof(Node)); make_node(m, "']'", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr15", 2, l, m); } ('.' SPACE ___:LIT_INTEGER { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'.'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, ___); $$ = n; }
+                      / '[' SPACE ___:maybe_expr ']' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'['", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, o, ___, p); $$ = n; }
+                      / '[' SPACE ']' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'['", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "']'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, p); $$ = n; }
+                      / '(' SPACE ___:maybe_exprs ')' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'('", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 4, $$, o, ___, p); $$ = n; }
+                      / '(' SPACE ')' SPACE { Node *o = (Node *)malloc(sizeof(Node)); make_node(o, "'('", 0); Node *p = (Node *)malloc(sizeof(Node)); make_node(p, "')'", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "expr15", 3, $$, o, p); $$ = n; }
+      )*
+
+expr16 <- ___:lit { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr16", 1, ___); }
+        / ___1:CONTINUE ___2:ident { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr16", 2, ___1, ___2); }
+        / ___:CONTINUE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr16", 1, ___); }
+        / ___1:BREAK ___2:ident { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr16", 2, ___1, ___2); }
+        / ___:BREAK { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "expr16", 1, ___); }
+
+vec_expr <- ___1:exprs ';' SPACE ___2:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "';'", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "vec_expr", 3, ___1, l, ___2); }
+          / ___:maybe_exprs { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "vec_expr", 1, ___); }
+
+maybe_exprs <- ___:exprs ',' SPACE { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "','", 0); $$ = (Node *)malloc(sizeof(Node)); make_node($$, "maybe_exprs", 2, ___, l); }
+             / ___:exprs { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "maybe_exprs", 1, ___); }
+
+maybe_expr <- ___:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "maybe_expr", 1, ___); }
+
+exprs <- ___1:expr { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "exprs", 1, ___1); } (',' SPACE ___2:expr { Node *l = (Node *)malloc(sizeof(Node)); make_node(l, "','", 0); Node *n = (Node *)malloc(sizeof(Node)); make_node(n, "exprs", 3, $$, l, ___2); $$ = n; })*
+
+lit <- ___:LIT_INTEGER { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "lit", 1, ___); }
+     / ___:LIT_FLOAT { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "lit", 1, ___); }
+     / ___:TRUE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "lit", 1, ___); }
+     / ___:FALSE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "lit", 1, ___); }
+
+ident <- ___:IDENT { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "ident", 1, ___); }
+
+BOX <- "box" !WORD SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "BOX", 0); }
+
+BREAK <- "break" !WORD SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "BREAK", 0); }
+
+CONTINUE <- "continue" !WORD SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "CONTINUE", 0); }
+
+FALSE <- "false" !WORD SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "FALSE", 0); }
+
+RETURN <- "return" !WORD SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "RETURN", 0); }
+
+TRUE <- "true" !WORD SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "TRUE", 0); }
+
+YIELD <- "yield" !WORD SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "YIELD", 0); }
+
+IDENT <- [a-zA-Z_] [a-zA-Z0-9_]* SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "IDENT", 0); }
+
+LIT_INTEGER <- "0x" [0-9a-fA-F_]+ SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "LIT_INTEGER", 0); }
+             / "0o" [0-7_]+ SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "LIT_INTEGER", 0); }
+             / "0b" [01_]+ SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "LIT_INTEGER", 0); }
+             / [0-9] [0-9_]* SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "LIT_INTEGER", 0); }
+             / [0-9] [0-9_]* "." ("." / [a-zA-Z]) SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "LIT_INTEGER", 0); }
+
+LIT_FLOAT <- [0-9] [0-9_]* "." [0-9_]* ([eE] [\-\+]? [0-9_]+)? SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "LIT_FLOAT", 0); }
+           / [0-9] [0-9_]* ("." [0-9_]*)? [eE] [\-\+]? [0-9_]+ SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "LIT_FLOAT", 0); }
+
+DOTDOT <- ".." SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "DOTDOT", 0); }
+
+EQEQ <- "==" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "EQEQ", 0); }
+
+NE <- "!=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "NE", 0); }
+
+LE <- "<=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "LE", 0); }
+
+SHLEQ <- "<<=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "SHLEQ", 0); }
+
+SHL <- "<<" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "SHL", 0); }
+
+GE <- ">=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "GE", 0); }
+
+SHREQ <- ">>=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "SHREQ", 0); }
+
+SHR <- ">>" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "SHR", 0); }
+
+MINUSEQ <- "-=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "MINUSEQ", 0); }
+
+ANDAND <- "&&" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "ANDAND", 0); }
+
+ANDEQ <- "&=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "ANDEQ", 0); }
+
+OROR <- "||" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "OROR", 0); }
+
+OREQ <- "|=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "OREQ", 0); }
+
+PLUSEQ <- "+=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "PLUSEQ", 0); }
+
+STAREQ <- "*=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "STAREQ", 0); }
+
+SLASHEQ <- "/=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "SLASHEQ", 0); }
+
+CARETEQ <- "^=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "CARETEQ", 0); }
+
+PERCENTEQ <- "%=" SPACE { $$ = (Node *)malloc(sizeof(Node)); make_node($$, "PERCENTEQ", 0); }
+
+SPACE <- [ \n\t\r]*
+
+WORD <- [a-zA-Z_0-9] SPACE
+
+%%
+void make_node(Node *n, char *name, int num, ...){
+  va_list args;
+  va_start(args, num);
+
+  strcpy(n -> name, name);
+  for(int i=0; i<num; i++)
+    n -> children[i] = va_arg(args, Node *);
+
+  va_end(args);
+}
+
+void make_dot(Node *n){
+  FILE *fp;
+  if ((fp = fopen("rust_expr_peg.dot", "w")) == NULL){
+    printf("Failed opening file.\n");
+    exit(1);
+  }
+  fprintf(fp, "digraph tree{\n");
+  fprintf(fp, "  graph [layout = dot, ordering = out]\n");
+  fclose(fp);
+
+  make_arrow(n, "");
+  if ((fp = fopen("rust_expr_peg.dot", "a+")) == NULL){
+      printf("Failed opening file.\n");
+      exit(1);
+  }
+  fprintf(fp, "}\n");
+  fclose(fp);
+}
+
+void make_arrow(Node *n, char *suffix){
+  char *str = (char*)malloc(strlen(suffix)+2);
+  FILE *fp;
+
+  for(int i=0; i<10; i++){
+    if ((fp = fopen("rust_expr_peg.dot", "a+")) == NULL){
+      printf("Failed opening file.\n");
+      exit(1);
+    }
+
+    if(n -> children[i] == NULL){
+      fclose(fp);
+      break;
+    }
+
+    sprintf(str, "%s%d", suffix, i);
+    if(n->children[i]->name[0] == '\''){
+      fprintf(fp, "  \"%s%s\" [label = \"%s\"]\n", n->children[i]->name, str, n->children[i]->name);
+      fprintf(fp, "  %s%s -> \"%s%s\" [dir = none]\n", n->name, suffix, n->children[i]->name, str);
+    }
+    else{
+      fprintf(fp, "  %s%s [label = \"%s\"]\n", n->children[i]->name, str, n->children[i]->name);
+      fprintf(fp, "  %s%s -> %s%s [dir = none]\n", n->name, suffix, n->children[i]->name, str);
+    }
+    fclose(fp);
+
+    make_arrow(n -> children[i], str);
+  }
+}
+
+int main(){
+  rust_expr_context_t *ctx = rust_expr_create(NULL);
+  rust_expr_parse(ctx, NULL);
+  rust_expr_destroy(ctx);
+  return 0;
+}
