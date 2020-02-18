@@ -27,6 +27,7 @@ class CanopyGenerator < Generator
           tmp_code += generate_rh(rule.rh.child.last) + "\n\n"
           code += tmp_code.lstrip
         else
+          @indents[-1] += -@idt + 2 if rule.rh[0].is_a?(Choice) || rule.rh[0].is_a?(Repeat)
           code += generate_rh(rule.rh).lstrip + "\n\n"
         end
         @indents.pop
