@@ -3,8 +3,9 @@ class Generator
   def initialize grammar
     @peg = grammar.grammar
     @start_symbol = grammar.start_symbol
-    @indent = [0]
+    @indents = [0]
     @choice_indent = 0
+    @idt = 4
   end
 
   def generate filename
@@ -15,14 +16,10 @@ class Generator
   end
 
   def generate_rh rh
-    @indent.push @indent.last
-    code = send("join_#{rh.class.name.downcase}", rh) 
-    @indent.pop
-    code
+    send("join_#{rh.class.name.downcase}", rh)
   end
 
   def join_string str, out_of_array = true
-    @indent[-1] += str.size + 1 if out_of_array
     str + " "
   end
 
@@ -68,12 +65,12 @@ class Generator
   end
 
   def join_choice choices, out_of_array = true
-    code = send("join_#{choices.child[0].class.name.downcase}", choices.child[0], false)
-    @indent.push @indent.last + 2
+    @indents.push @indents.last + @idt
+    code = "\n" + " "*(@indents.last+1) + "(" + send("join_#{choices.child[0].class.name.downcase}", choices.child[0], false)
 #      @indent[-1] -= 1
-    choices.child.drop(1).each{|sym| code += "\n" + " "*@indent.last + "/ " + send("join_#{sym.class.name.downcase}", sym, false) }
-    @indent.pop
-    "(" + code.rstrip + ")"
+    choices.child.drop(1).each{|sym| code += "\n" + " "*@indents.last + "/ " + send("join_#{sym.class.name.downcase}", sym, false) }
+    @indents.pop
+    code.rstrip + ")"
   end
 
   def join_nilclass sym, out_of_array = true
@@ -83,23 +80,5 @@ class Generator
   def judge_param code, ary
     code != '(' && (ary.size > 1 && ary.find{|a| a.is_a?(String)} \
       || (ary.size == 1 && ary.find{|a| a.is_a?(Array) && a.size > 1 && a.find{|b| b.is_a?(String)}}))
-  end
-
-  def fix_indent code
-    code = code.split("\n")
-    code.each_with_index do |line, idx|
-      case line
-      when /\)\([^)]*\Z/
-        @choice_indent = line[/(\s\S+)+\)\(/].size - 3
-      when /\)/
-        code[idx] = line[/\A\s*/] + " "*@choice_indent + line[/\S.*\Z/]
-        @choice_indent = 0
-      when /\A\S|\A\Z/
-        # do nothing
-      else
-        code[idx] = line[/\A\s*/] + " "*@choice_indent + line[/\S.*\Z/]
-      end
-    end
-    code.join("\n")
   end
 end

@@ -8,19 +8,19 @@ class RatsGenerator < Generator
 
     File.open(filename, "w"){|file|
       @peg.each{|rule|
-        @indent.push rule.lh.size+5
+        @indents.push rule.lh.size+5
         code += "void #{rule.lh} = " 
         
         (rule.rh.size-1).times{|n|
-          code += generate_rh(rule.rh[n]) + "\n" + " "*@indent.last + " / "
+          code += generate_rh(rule.rh[n]) + "\n" + " "*@indents.last + " / "
         }
         
         if rule.rh.size > 1
-          code += generate_rh(rule.rh.last) + "\n" +" "*(@indent.last+1) + ";\n\n"
+          code += generate_rh(rule.rh.last) + "\n" +" "*(@indents.last+1) + ";\n\n"
         else
           code += generate_rh(rule.rh.last).rstrip + ";\n\n"
         end
-        @indent.pop
+        @indents.pop
       }
       file.write code
     }

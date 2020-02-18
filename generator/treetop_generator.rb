@@ -32,18 +32,18 @@ class TreetopGenerator < Generator
     
     File.open(filename, "w"){|file|
       @peg.each{|rule|
-        @indent.push 4
+        @indents.push 4
         code += "  rule #{rule.lh}\n      "
         
         (rule.rh.size-1).times{|n|
 
 #          code += generate_rh(rule.rh[n]) + TREETOP_DEBUG + " "*@indent.last + "/ "
-          code += generate_rh(rule.rh[n]) + "\n" + " "*@indent.last + "/ "
+          code += generate_rh(rule.rh[n]) + "\n" + " "*@indents.last + "/ "
         }
         
 #        code += generate_rh(rule.rh.last) + "#{TREETOP_DEBUG}\n  end\n\n"
         code += generate_rh(rule.rh.last) + "\n  end\n\n"
-        @indent.pop
+        @indents.pop
       }
       code += "end\n"
       file.write code
