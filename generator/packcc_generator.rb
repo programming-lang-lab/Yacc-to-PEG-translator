@@ -22,7 +22,6 @@ class PackCCGenerator < Generator
         end
         @indents.pop
       }
-      code = fix_indent(code)
       code += "%%\n int main(){\n  #{name}_context_t *ctx = #{name}_create(NULL);\n  #{name}_parse(ctx, NULL);\n  #{name}_destroy(ctx);\n  return 0;\n}\n"
       file.write code
     }

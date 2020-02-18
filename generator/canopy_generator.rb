@@ -31,7 +31,7 @@ class CanopyGenerator < Generator
         end
         @indents.pop
       }
-      file.write fix_indent(code).rstrip
+      file.write code.rstrip
     }
 
     exit 0
