@@ -13,10 +13,12 @@ class PackCCGenerator < Generator
         @indents.push rule.lh.size + 1
         code += "#{rule.lh} <- "
         if rule.rh.is_a?(Choice)
-          (rule.rh.child.size-1).times{|n| code += generate_rh(rule.rh.child[n]) + "\n" + " "*@indents.last + " / " }
-          code += generate_rh(rule.rh.child.last) + "\n\n"
+          tmp_code = ""
+          (rule.rh.child.size-1).times{|n| tmp_code += generate_rh(rule.rh.child[n]) + "\n" + " "*@indents.last + " / " }
+          tmp_code += generate_rh(rule.rh.child.last) + "\n\n"
+          code += tmp_code.lstrip
         else
-          code += generate_rh(rule.rh) + "\n\n"
+          code += generate_rh(rule.rh).lstrip + "\n\n"
         end
         @indents.pop
       }
