@@ -34,7 +34,13 @@ class Generator
 
   def join_repeat rpt
     code = send("join_#{rpt.child.class.name.downcase}", rpt.child)
-    code.rstrip + "* "
+    code.rstrip!
+    if rpt.child.size == 1 && rpt.child[0].is_a?(Array) && rpt.child[0].size > 1
+      code = "(" + code + ")* "
+    else
+      code += "* "
+    end
+    code
   end
 
   def join_negativelookahead neg
