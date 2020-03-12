@@ -1,0 +1,5 @@
+start <- a 
+
+a <- (F C A 
+    / D A 
+    / B)(E C A)*
