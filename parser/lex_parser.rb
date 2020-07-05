@@ -145,7 +145,6 @@ class LexParser < Parser
           @reserved_words.push [item]
         }
       end
-      
       @tmp_rule.rh.last.push rh
 
       @@token_pairs.push ary if ary.size > 1
@@ -176,7 +175,7 @@ class LexParser < Parser
                 @tmp_rule.rh = Choice.new(@tmp_rule.rh)
                 @rules.push @tmp_rule
               else
-                @tmp_rule.rh = @tmp_rule.rh[0]
+                # @tmp_rule.rh = @tmp_rule.rh[0]
                 @rules.push @tmp_rule
               end
             end
@@ -185,7 +184,7 @@ class LexParser < Parser
         else
           # type code here
         end
-        
+
         @tmp_rule = Marshal.load(Marshal.dump(@tmp_rule))
       }
     else
